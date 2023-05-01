@@ -27,8 +27,41 @@ def noisify_label(true_label, noise_type="symmetric"):
     else:
         raise ValueError("noise_type must be symmetric or pairflip")
     return noisy_label
-    
+
+def number_list_to_onehot_array_list(number_list, num_classes=10):
+    onehot_array_list = []
+    for number in number_list:
+        onehot_array = np.zeros(num_classes)
+        onehot_array[number] = 1
+        onehot_array_list.append(onehot_array)
+    return np.array(onehot_array_list)
+
+def onehot_array_list_to_number_list(onehot_array_list):
+    number_list = []
+    for onehot_array in onehot_array_list:
+        number_list.append(np.argmax(onehot_array))
+    return np.array(number_list)
+
 def add_noisy_labels(labels, noise_type="symmetric", noise_rate=0.1, num_classes=10):
+    """Add noise to the labels.
+    Args:
+        labels: true labels
+        noise_type: "symmetric" or "pairflip"
+        noise_rate: noise rate
+        num_classes: number of classes
+    Returns:
+        noisy labels
+    """
+    noisy_labels = labels.copy()
+    if noisy_labels.ndim == 1:
+        noisy_labels = number_list_to_onehot_array_list(noisy_labels, num_classes=num_classes)
+        noisy_labels = __add_noisy_labels(noisy_labels, noise_type=noise_type, noise_rate=noise_rate, num_classes=num_classes)
+        noisy_labels = onehot_array_list_to_number_list(noisy_labels)
+    else:
+        noisy_labels = __add_noisy_labels(noisy_labels, noise_type=noise_type, noise_rate=noise_rate, num_classes=num_classes)
+    return noisy_labels
+
+def __add_noisy_labels(labels, noise_type="symmetric", noise_rate=0.1, num_classes=10):
     """Add noise to the labels.
     Args:
         labels: true labels

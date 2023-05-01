@@ -264,7 +264,7 @@ class FedMHAD(FedAvg):
             publicset = pascal_voc_partition.load_public_dataset()
         elif self.args.dataset == "cifar10":
             partition = Cifar10Partition(args=self.args)
-            trainset, publicset = partition.load_partition(-1)
+            publicset = partition.load_public_dataset()
         n_train = len(publicset)
         if self.args.toy:
             publicset = torch.utils.data.Subset(publicset, range(n_train - 10, n_train))

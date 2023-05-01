@@ -16,7 +16,10 @@ execute "run.sh" file
 
 ## Prepare Dataset
 
-(will add prepare dataset code later)
+0. cifar10 dataset
+1. tiny-imagenet dataset (https://www.kaggle.com/datasets/akash2sharma/tiny-imagenet)
+2. pascal_voc_2012
+3. mscoco
 
 ## Results
 

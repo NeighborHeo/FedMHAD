@@ -148,24 +148,24 @@ def plot_whole_y_distribution(y_data):
 
 class Cifar10Partition: 
     def __init__(self, args: argparse.Namespace):
-        utils.print_func_and_line()
         self.args = args
         # print("num_clients: ", self.args.num_clients, "N_class: ", self.args.num_classes, "alpha: ", self.args.alpha)
         # self.partition_indices = self.init_partition()
         
     def init_partition(self):
-        utils.print_func_and_line()
         self.split_data = get_dirichlet_split_data(self.train_images, self.train_labels, self.args.num_clients, self.args.num_classes, self.args.alpha)
         
     def load_partition(self, i: int):
-        utils.print_func_and_line()
-        train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_train_224_ap_{self.args.alpha}'
-        test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_test_224_ap_{self.args.alpha}'
-        if not train_folder_path.exists() or not test_folder_path.exists():
-            print("No such directory: ", train_folder_path, " or ", test_folder_path)
-        else : 
+        if self.args.noisy > 0:
+            train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_train_224_ns_{self.args.noisy}'
+            test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_test_224_ns_{self.args.noisy}'
+        else:
+            train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_train_224_ap_{self.args.alpha}'
+            test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_test_224_ap_{self.args.alpha}'
+        
+        if train_folder_path.exists() and test_folder_path.exists():
             self.train_images = np.load(train_folder_path / f'Party_{i}_X_data.npy')
-            self.train_labels = np.load(train_folder_path / f'Party_{i}_y_data.npy')
+            self.train_labels = np.load(train_folder_path / (f'Party_{i}_y_data.npy' if not self.args.noisy > 0 else f'Party_{i}_y_noisy_data.npy'))
             self.test_images = np.load(test_folder_path / f'Party_{i}_X_data.npy')
             self.test_labels = np.load(test_folder_path / f'Party_{i}_y_data.npy')
         print("train_images: ", self.train_images.shape, "train_labels: ", self.train_labels.shape)
@@ -178,7 +178,20 @@ class Cifar10Partition:
         labels = [dataset[i][1] for i in range(len(dataset))]
         return np.bincount(labels)
 
-
+    def load_public_dataset(self):
+        path = pathlib.Path.home().joinpath('.data', 'ImageNet')
+        if not path.joinpath('train_images_1_20.npy').exists():
+            public_imgs = np.load(path.joinpath('train_images.npy'))
+            public_labels = np.load(path.joinpath('train_labels.npy'))
+            index = np.random.choice(public_imgs.shape[0], int(public_imgs.shape[0]/20), replace=False)
+            public_imgs = public_imgs[index]
+            public_labels = public_labels[index]
+            np.save(path.joinpath('train_images_1_20.npy'), public_imgs)
+            np.save(path.joinpath('train_labels_1_20.npy'), public_labels)
+        else :
+            public_imgs = np.load(path.joinpath('train_images_1_20.npy'))
+            public_labels = np.load(path.joinpath('train_labels_1_20.npy'))
+            
 # class Cifar10Partition: 
 #     def __init__(self, args: argparse.Namespace):
 #         self.args = args

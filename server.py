@@ -127,9 +127,9 @@ class ServerManager:
             return fl.server.strategy.FedAvg(
                 fraction_fit=1,
                 fraction_evaluate=1,
-                min_fit_clients=2,
-                min_evaluate_clients=2,
-                min_available_clients=2,
+                min_fit_clients=10,
+                min_evaluate_clients=10,
+                min_available_clients=10,
                 evaluate_fn=self.get_evaluate_fn(model, toy),
                 on_fit_config_fn=self.fit_config,
                 on_evaluate_config_fn=self.evaluate_config,
