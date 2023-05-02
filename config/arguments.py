@@ -26,8 +26,7 @@ def init_args(server=True):
     parser.add_argument("--weight_decay", type=float, default=1e-5, required=False, help="Weight decay. Default: 1e-5")
     parser.add_argument("--batch_size", type=int, default=32, required=False, help="Batch size. Default: 32")
     # server arguments
-    if server:
-        parser.add_argument("--strategy", type=str, default="fedavg", required=False, help="Strategy to use. Default: fedmhad")
+    parser.add_argument("--strategy", type=str, default="fedavg", required=False, help="Strategy to use. Default: fedmhad")
     # client arguments
     if not server:
         parser.add_argument("--index", type=int, default=0, required=False, help="Index of the client")

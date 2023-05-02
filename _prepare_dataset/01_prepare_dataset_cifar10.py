@@ -273,6 +273,13 @@ def make_cifar10_dirichlet_noise_data(datapath, N_parties, N_classes, noise, sam
     else:
         print(f"cifar10 data already exists")
 
+def sampling_data(data, labels, sampling_ratio=1.0, seed=42):
+    if sampling_ratio < 1.0:
+        include_idx, exclude_idx, _, _ = train_test_split(np.arange(0, len(labels)), np.arange(0, len(labels)), train_size=sampling_ratio, random_state=seed, stratify=labels)
+        data = data[include_idx]
+        labels = labels[include_idx]
+    return data, labels
+
 def make_cifar10_growing_dirichlet_data(datapath, N_parties, N_classes, alpha=1000, sampling_ratio=1.0, seed=42):
     train_path = pathlib.Path(datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'train'
     test_path = pathlib.Path(datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'test'
@@ -282,24 +289,18 @@ def make_cifar10_growing_dirichlet_data(datapath, N_parties, N_classes, alpha=10
         
         train_images = np.load(pathlib.Path(datapath).expanduser() / 'cifar10' / 'cifar10_train_224_images.npy')
         train_labels = np.load(pathlib.Path(datapath).expanduser() / 'cifar10' / 'cifar10_train_224_labels.npy')
-        if sampling_ratio < 1.0:
-            include_idx, exclude_idx, _, _ = train_test_split(np.arange(0, len(train_labels)), np.arange(0, len(train_labels)), train_size=sampling_ratio, random_state=42, stratify=train_labels)
-            train_images = train_images[include_idx]
-            train_labels = train_labels[include_idx]
+        train_images, train_labels = sampling_data(train_images, train_labels, sampling_ratio, seed)
         
         test_images = np.load(pathlib.Path(datapath).expanduser() / 'cifar10' / 'cifar10_test_224_images.npy')
         test_labels = np.load(pathlib.Path(datapath).expanduser() / 'cifar10' / 'cifar10_test_224_labels.npy')
-        if sampling_ratio < 1.0:
-            include_idx, exclude_idx, _, _ = train_test_split(np.arange(0, len(test_labels)), np.arange(0, len(test_labels)), train_size=sampling_ratio, random_state=42, stratify=test_labels)
-            test_images = test_images[include_idx]
-            test_labels = test_labels[include_idx]
-            
+        test_images, test_labels = sampling_data(test_images, test_labels, sampling_ratio, seed)
+
         np.save(train_path / f'Party_{-1}_X_data.npy', train_images)
         np.save(train_path / f'Party_{-1}_y_data.npy', train_labels)
         np.save(test_path / f'Party_{-1}_X_data.npy', test_images)
         np.save(test_path / f'Party_{-1}_y_data.npy', test_labels)
 
-        start = 1000
+        start = 10
         stop = 0.1
         result = np.logspace(np.log10(start), np.log10(stop), N_parties, endpoint=True)
         for i in range(N_parties):
@@ -316,6 +317,7 @@ def make_cifar10_growing_dirichlet_data(datapath, N_parties, N_classes, alpha=10
             np.save(train_path / f'Party_{i}_X_data.npy', image)
             np.save(train_path / f'Party_{i}_y_data.npy', labels)
             len_test = int(len(test_labels) / N_parties)
+
             images, labels = test_images[range(i*len_test, (i+1)*len_test)], test_labels[range(i*len_test, (i+1)*len_test)]
             np.save(test_path / f'Party_{i}_X_data.npy', images)
             np.save(test_path / f'Party_{i}_y_data.npy', labels)
@@ -338,7 +340,7 @@ def main():
     args.alpha = 0.1
     args.task = 'singlelabel'
     args.batch_size = 16
-    args.noisy = 0.03
+    args.noisy = 0.0
     args.growing = True
 
     cifar10 = Cifar10Partition(args)
@@ -350,3 +352,4 @@ def main():
         
 if __name__ == '__main__':
     main()
+# %%

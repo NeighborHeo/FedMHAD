@@ -1,3 +1,6 @@
+from comet_ml import Experiment
+# from comet_ml.integration.pytorch import log_model
+
 from torch.utils.data import DataLoader
 import torchvision.datasets
 import numpy as np
@@ -19,9 +22,6 @@ warnings.filterwarnings("ignore")
 import os
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env_comet'))
-
-from comet_ml import Experiment
-# from comet_ml.integration.pytorch import log_model
 
 class CustomClient(fl.client.NumPyClient):
     def __init__(
@@ -175,6 +175,7 @@ def init_comet_experiment(args: argparse.Namespace):
         workspace= os.getenv('COMET_WORKSPACE'),
     )
     experiment.log_parameters(args)
+    experiment.add_tag(args.strategy)
     experiment.set_name(f"client_{args.index}_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     return experiment
 

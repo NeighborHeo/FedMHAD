@@ -1,3 +1,6 @@
+from comet_ml import Experiment
+# from comet_ml.integration.pytorch import log_model
+
 from typing import Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 from collections import OrderedDict
@@ -21,9 +24,6 @@ import multiprocessing
 import os
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env_comet'))
-
-from comet_ml import Experiment
-# from comet_ml.integration.pytorch import log_model
 
 class ServerManager:
     def __init__(self, model: torch.nn.Module, args: argparse.Namespace, experiment: Optional[Experiment] = None):
@@ -162,6 +162,7 @@ def init_comet_experiment(args: argparse.Namespace):
         workspace= os.getenv('COMET_WORKSPACE'),
     )
     experiment.log_parameters(args)
+    experiment.add_tag(args.strategy)
     experiment.set_name(f"global_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     return experiment
 
