@@ -32,7 +32,8 @@ class ServerManager:
         self.save_path = f"checkpoints/{args.port}/global"
         self.early_stopper = utils.EarlyStopper(patience=10, delta=1e-4, checkpoint_dir=self.save_path)
         self.strategy = self.create_strategy(model, args.toy)
-        
+        self.valLoader = None
+
     def fit_config(self, server_round: int) -> Dict[str, int]:
         return {
             "server_round": server_round,
@@ -47,31 +48,40 @@ class ServerManager:
             "server_round": server_round
         }
 
-    def get_evaluate_fn(self, model: torch.nn.Module, toy: bool):
+    def __check_n_load_val_loader(self):
+        if self.valLoader is not None:
+            return self.valLoader
+        
+        self.valLoader = self.__load_val_loader()
+        return self.valLoader
+    
+    def __load_val_loader(self):
+        print("Loading val loader...")
         if self.args.dataset == "pascal_voc":
             partition = datasets.PascalVocPartition(args=self.args)
         elif self.args.dataset == "cifar10":
             partition = datasets.Cifar10Partition(args=self.args)
-        trainset, testset = partition.load_partition(-1)
-        print(f"len(trainset) : {len(trainset)}, len(testset) : {len(testset)}")
+        _, testset = partition.load_partition(-1)
         n_train = len(testset)
-        if toy:
+        if self.args.toy:
             valset = torch.utils.data.Subset(testset, range(n_train - 10, n_train))
         else:
             valset = torch.utils.data.Subset(testset, range(0, n_train))
-
-        valLoader = DataLoader(valset, batch_size=self.args.batch_size)
-
+        print("Val loader loaded.")
+        return DataLoader(valset, batch_size=self.args.batch_size)
+    
+    def get_evaluate_fn(self, model: torch.nn.Module, toy: bool):
         def evaluate(
             server_round: int,
             parameters: fl.common.NDArrays,
             config: Dict[str, fl.common.Scalar],
         ) -> Optional[Tuple[float, Dict[str, fl.common.Scalar]]]:
+            val_loader = self.__check_n_load_val_loader()
             state_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(model.state_dict().keys(), parameters)})
             model.load_state_dict(state_dict, strict=True)
 
             device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
-            result = utils.test(model, valLoader, device=device, args=self.args)
+            result = utils.test(model, val_loader, device=device, args=self.args)
             accuracy = result["acc"]
             loss = result["loss"]
             
@@ -101,9 +111,9 @@ class ServerManager:
             return FedDF(
                 fraction_fit=1,
                 fraction_evaluate=1,
-                min_fit_clients=2,
-                min_evaluate_clients=2,
-                min_available_clients=2,
+                min_fit_clients=10,
+                min_evaluate_clients=10,
+                min_available_clients=10,
                 evaluate_fn=self.get_evaluate_fn(model, toy),
                 on_fit_config_fn=self.fit_config,
                 on_evaluate_config_fn=self.evaluate_config,
@@ -114,9 +124,9 @@ class ServerManager:
             return FedMHAD( 
                 fraction_fit=1,
                 fraction_evaluate=1,
-                min_fit_clients=2,
-                min_evaluate_clients=2,
-                min_available_clients=2,
+                min_fit_clients=10,
+                min_evaluate_clients=10,
+                min_available_clients=10,
                 evaluate_fn=self.get_evaluate_fn(model, toy),
                 on_fit_config_fn=self.fit_config,
                 on_evaluate_config_fn=self.evaluate_config,

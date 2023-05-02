@@ -131,11 +131,33 @@ class FedDF(FedAvg):
         self.fit_metrics_aggregation_fn = fit_metrics_aggregation_fn
         self.evaluate_metrics_aggregation_fn = evaluate_metrics_aggregation_fn
         self.args = args
+        self.publicLoader = None
 
     def __repr__(self) -> str:
         rep = f"FedMedian(accept_failures={self.accept_failures})"
         return rep
 
+    def __check_n_load_public_loader(self):
+        if self.publicLoader is not None:
+            return self.publicLoader
+        self.publicLoader = self.__load_public_loader()
+        return self.publicLoader
+    
+    def __load_public_loader(self):
+        if self.args.dataset == "pascal_voc":
+            pascal_voc_partition = PascalVocPartition(args=self.args)
+            publicset = pascal_voc_partition.load_public_dataset()
+        elif self.args.dataset == "cifar10":
+            partition = Cifar10Partition(args=self.args)
+            publicset = partition.load_public_dataset()
+        n_train = len(publicset)
+        if self.args.toy:
+            publicset = torch.utils.data.Subset(publicset, range(n_train - 10, n_train))
+        else:
+            publicset = torch.utils.data.Subset(publicset, range(0, n_train))
+        publicLoader = DataLoader(publicset, batch_size=self.args.batch_size)
+        return publicLoader
+    
     def aggregate_fit(
         self,
         server_round: int,
@@ -163,7 +185,7 @@ class FedDF(FedAvg):
             
         return parameters_aggregated, metrics_aggregated
 
-    def get_fedavg_model(self, results: List[Tuple[ClientProxy, FitRes]]) -> torch.nn.Module:
+    def __get_fedavg_model(self, results: List[Tuple[ClientProxy, FitRes]]) -> torch.nn.Module:
         weights_results = [
             (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
             for _, fit_res in results
@@ -177,17 +199,11 @@ class FedDF(FedAvg):
         model.load_state_dict(state_dict, strict=True)
         return model
 
-    def ensemble_logits(self, logits_list: List[torch.Tensor]) -> torch.Tensor:
-        """Ensemble logits from multiple models."""
-        stacked_logits = torch.stack(logits_list, dim=0)
-        ensembled_logits = torch.mean(stacked_logits, dim=0)
-        return ensembled_logits
-
-    def get_class_count_from_dict(self, class_dict: Dict[str, Scalar]) -> List[int]:
+    def __get_class_count_from_dict(self, class_dict: Dict[str, Scalar]) -> List[int]:
         """Get the number of classes from the class dictionary."""
         return torch.tensor([max(1, int(class_dict[str(i)])) for i in range(self.args.num_classes)])
 
-    def get_logits(self, model: torch.nn.Module, publicLoader: DataLoader) -> torch.Tensor:
+    def __get_logits(self, model: torch.nn.Module, publicLoader: DataLoader) -> torch.Tensor:
         """Infer logits from the given model."""
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model.to(device)
@@ -196,7 +212,7 @@ class FedDF(FedAvg):
         logits_list = []
         m = torch.nn.Sigmoid()
         with torch.no_grad():
-            for inputs, _ in publicLoader:
+            for inputs, _ in tqdm(publicLoader):
                 inputs = inputs.to(device)
                 logits = model(inputs)
                 logits_list.append(m(logits).detach())
@@ -206,26 +222,17 @@ class FedDF(FedAvg):
         """Aggregate the results of the training rounds."""
 
         # Step 1: Get the logits from all the models
-        publicLoader = self.load_public_loader()
-        fedavg_model = self.get_fedavg_model(results)
+        publicLoader = self.__check_n_load_public_loader()
+        fedavg_model = self.__get_fedavg_model(results)
 
-        # def process(fit_res):
-        #     copied_model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
-        #     copied_model = self.load_parameter(copied_model, parameters_to_ndarrays(fit_res.parameters))
-        #     logits = self.get_logits_and_attns(copied_model, publicLoader)
-        #     return logits
-        # with multiprocessing.Pool(processes=4) as pool:
-        #     results = list(pool.imap(process, [fit_res for _, fit_res in results]), total=len(results))
-        #     logits_list = [logits for logits in results]
-        
         logits_list = []
         class_counts = []
         for _, fit_res in tqdm(results):
             copied_model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
             copied_model = self.load_parameter(copied_model, parameters_to_ndarrays(fit_res.parameters))
-            logits = self.get_logits(copied_model, publicLoader)
+            logits = self.__get_logits(copied_model, publicLoader)
             logits_list.append(logits)
-            class_counts.append(self.get_class_count_from_dict(fit_res.metrics))
+            class_counts.append(self.__get_class_count_from_dict(fit_res.metrics))
         total_logits = torch.stack(logits_list, dim=0)
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         class_counts = torch.stack(class_counts, dim=0).to(device)
@@ -246,18 +253,3 @@ class FedDF(FedAvg):
         distilled_parameters = [val.cpu().numpy() for _, val in distilled_model.state_dict().items()]
 
         return distilled_parameters
-
-    def load_public_loader(self):
-        if self.args.dataset == "pascal_voc":
-            pascal_voc_partition = PascalVocPartition(args=self.args)
-            publicset = pascal_voc_partition.load_public_dataset()
-        elif self.args.dataset == "cifar10":
-            partition = Cifar10Partition(args=self.args)
-            publicset = partition.load_public_dataset()
-        n_train = len(publicset)
-        if self.args.toy:
-            publicset = torch.utils.data.Subset(publicset, range(n_train - 10, n_train))
-        else:
-            publicset = torch.utils.data.Subset(publicset, range(0, n_train))
-        publicLoader = DataLoader(publicset, batch_size=self.args.batch_size)
-        return publicLoader

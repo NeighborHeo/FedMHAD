@@ -26,29 +26,39 @@ from comet_ml import Experiment
 class CustomClient(fl.client.NumPyClient):
     def __init__(
         self,
-        trainset: torchvision.datasets,
-        testset: torchvision.datasets,
         validation_split: int = 0.1,
         experiment: Optional[Experiment] = None,
         args: Optional[argparse.Namespace] = None,
     ):
-        self.trainset = trainset
-        self.testset = testset
         self.validation_split = validation_split
         self.experiment = experiment
         self.args = args
         self.save_path = f"checkpoints/{args.port}/client_{args.index}_best_models"
         self.early_stopper = utils.EarlyStopper(patience=10, delta=1e-4, checkpoint_dir=self.save_path)
-        self.class_counts = self.getClassCounts(self.trainset, num_classes=args.num_classes)
+        self.trainset = None
+        self.testset = None
+        self.class_counts = None
+        
+    def __check_n_load_dataset(self):
+        if self.trainset is None or self.testset is None:
+            self.trainset, self.testset = self.__load_dataset()
+            self.class_counts = self.__getClassCounts(self.trainset, num_classes=self.args.num_classes)
     
-    # def get_properties(self, config: Config) -> Dict[str, Scalar]:
-    #     ret = super().get_properties(config)
-    #     ret["my_custom_property"] = 42.0
-    #     return ret
+    def __load_dataset(self):
+        print("Loading dataset...")
+        if self.args.dataset == "cifar10":
+            cifar10_partition = datasets.Cifar10Partition(self.args)
+            trainset, testset = cifar10_partition.load_partition(self.args.index)
+        else:
+            pascal_voc_partition = datasets.PascalVocPartition(self.args)
+            trainset, testset = pascal_voc_partition.load_partition(self.args.index)
+        if self.args.toy:
+            trainset = torch.utils.data.Subset(trainset, range(10))
+            testset = torch.utils.data.Subset(testset, range(10))
+        print("Dataset loaded.")
+        return trainset, testset
     
-    # def get_parameters(self, config: Config) -> NDArrays:
-    #     return [val.cpu().numpy() for _, val in model.state_dict().items()]
-    def getClassCounts(self, dataset, num_classes):
+    def __getClassCounts(self, dataset, num_classes):
         if self.args.task == "multilabel":
             counts = np.sum([dataset[i][1] for i in range(len(dataset))], axis=0)
         else:
@@ -69,7 +79,9 @@ class CustomClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         """Train parameters on the locally held training set."""
-
+        # Load dataset
+        self.__check_n_load_dataset()
+        
         # Update local model parameters
         model = self.set_parameters(parameters)
 
@@ -113,6 +125,9 @@ class CustomClient(fl.client.NumPyClient):
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
+        # Load dataset
+        self.__check_n_load_dataset()
+
         # Update local model parameters
         model = self.set_parameters(parameters)
 
@@ -179,22 +194,8 @@ def main() -> None:
     if args.dry:
         client_dry_run(experiment, args)
     else:
-        # Load a subset of CIFAR-10 to simulate the local data partition
-        # trainset, testset = utils.load_partition(args.index)
-        
-        if args.dataset == "cifar10":
-            cifar10_partition = datasets.Cifar10Partition(args)
-            trainset, testset = cifar10_partition.load_partition(args.index)
-        else:
-            pascal_voc_partition = datasets.PascalVocPartition(args)
-            trainset, testset = pascal_voc_partition.load_partition(args.index)
-            
-        if args.toy:
-            trainset = torch.utils.data.Subset(trainset, range(10))
-            testset = torch.utils.data.Subset(testset, range(10))
-
         # Start Flower client
-        client = CustomClient(trainset, testset, 0.1, experiment, args)
+        client = CustomClient(validation_split=0.1, experiment=experiment, args=args)
         fl.client.start_numpy_client(server_address=f"0.0.0.0:{args.port}", client=client)
 
     experiment.end()

@@ -66,7 +66,6 @@ def load_partition(idx: int):
 def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
     """Train the network on the training set."""
     print("Starting training...")
-    
     net.to(device)  # move model to GPU if available
     if args.task == 'singlelabel' : 
         criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -99,10 +98,10 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
     net.to("cpu")  # move model back to CPU
 
     # train_loss, train_acc = test(net, trainloader)
-    results1 = test(net, trainloader, args=args)
+    results1 = test(net, trainloader, device=device, args=args)
     results1 = {f"train_{k}": v for k, v in results1.items()}
     # val_loss, val_acc = test(net, valloader)
-    results2 = test(net, valloader, args=args)
+    results2 = test(net, valloader, device=device, args=args)
     results2 = {f"val_{k}": v for k, v in results2.items()}
     results = {**results1, **results2}
     return results
