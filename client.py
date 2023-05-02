@@ -175,7 +175,7 @@ def init_comet_experiment(args: argparse.Namespace):
         workspace= os.getenv('COMET_WORKSPACE'),
     )
     experiment.log_parameters(args)
-    experiment.set_name(f"client_{args.index}_({args.port})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
+    experiment.set_name(f"client_{args.index}_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     return experiment
 
 def test_load_cifar10_partition():
