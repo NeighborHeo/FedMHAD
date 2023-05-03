@@ -12,6 +12,8 @@ class EarlyStopper:
         self.best_acc = 0
         self.counter = 0
         self.is_best = False
+        
+        self.last_save_path = None
     
     def is_best_loss(self, score):
         if score < self.best_loss - self.delta:
@@ -38,10 +40,13 @@ class EarlyStopper:
             os.makedirs(self.checkpoint_dir)
         
         if self.is_best:
+            if self.last_save_path is not None:
+                os.remove(self.last_save_path)
             if filename is None:
                 filename = 'best_model.pth'
             print(f"Best checkpoint at epoch {epoch}, loss: {loss:.4f}, accuracy: {acc:.4f}")
             torch.save(model.state_dict(), os.path.join(self.checkpoint_dir, filename))
+            self.last_save_path = os.path.join(self.checkpoint_dir, filename)
             
         if self.counter >= self.patience:
             print(f"Early stopping at epoch {epoch}, loss: {loss:.4f}, accuracy: {acc:.4f}")

@@ -191,6 +191,8 @@ class Cifar10Partition:
         else :
             public_imgs = np.load(path.joinpath('train_images_1_20.npy'))
             public_labels = np.load(path.joinpath('train_labels_1_20.npy'))
+        public_set = mydataset(public_imgs, public_labels)
+        return public_set
             
 # class Cifar10Partition: 
 #     def __init__(self, args: argparse.Namespace):

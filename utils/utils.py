@@ -181,7 +181,7 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
         for i, (inputs, _) in enumerate(publicLoader):
             inputs = inputs.to(device)
             optimizer.zero_grad()
-            outputs, attns = model(inputs, return_attn=True)
+            outputs = model(inputs)
             outputs = m(outputs)
             loss = criterion(outputs, ensembled_logits[i * args.batch_size:(i + 1) * args.batch_size].to(device))
             lambda_ = 0.09
@@ -191,7 +191,7 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
         print(f"Distillation Epoch {epoch + 1}/{args.local_epochs}, Loss: {running_loss / len(publicLoader)}")
     return model
 
-def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.Tensor, total_attns: torch.Tensor, sim_weights: torch.Tensor, publicLoader: DataLoader, args: argparse.Namespace) -> torch.nn.Module:
+def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.Tensor, total_attns: torch.Tensor, sim_weights: torch.Tensor, images: torch.Tensor, args: argparse.Namespace) -> torch.nn.Module:
     """Perform distillation training."""
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -207,26 +207,16 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
     m = torch.nn.Sigmoid()
-    for epoch in range(args.local_epochs):
-        running_loss = 0.0
-        for i, (inputs, _) in enumerate(publicLoader):
-            inputs = inputs.to(device)
-            optimizer.zero_grad()
-            outputs, attns = model(inputs, return_attn=True)
-            outputs = m(outputs)
-            loss = criterion(outputs, ensembled_logits[i * args.batch_size:(i + 1) * args.batch_size].to(device))
-            loss2 = criterion2(total_attns[:, i * args.batch_size:(i + 1) * args.batch_size].to(device), attns, sim_weights)
-            # if torch.isnan(loss):
-            #     print("loss is NaN")
-            # if torch.isnan(loss2):
-            #     print("loss2 is NaN")
-            lambda_ = 0.09
-            total_loss = (1-lambda_) * loss + lambda_ * loss2
-            total_loss.backward()
-            optimizer.step()
-
-            running_loss += total_loss.item()
-        print(f"Distillation Epoch {epoch + 1}/{args.local_epochs}, Loss: {running_loss / len(publicLoader)}")
+    images = images.to(device)
+    optimizer.zero_grad()
+    outputs, attns = model(images, return_attn=True)
+    outputs = m(outputs)
+    loss = criterion(outputs, ensembled_logits.to(device))
+    loss2 = criterion2(total_attns.to(device), attns, sim_weights)
+    lambda_ = 0.09
+    total_loss = (1-lambda_) * loss + lambda_ * loss2
+    total_loss.backward()
+    optimizer.step()
     return model
 
 def compute_class_weights(class_counts):

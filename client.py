@@ -176,6 +176,7 @@ def init_comet_experiment(args: argparse.Namespace):
     )
     experiment.log_parameters(args)
     experiment.add_tag(args.strategy)
+    experiment.add_tag(args.model_name)
     experiment.set_name(f"client_{args.index}_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     return experiment
 
