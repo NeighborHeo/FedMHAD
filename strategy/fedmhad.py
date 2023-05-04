@@ -215,7 +215,10 @@ class FedMHAD(FedAvg):
         model.eval()
         logits_list = []
         total_attns = []
-        m = torch.nn.Sigmoid().to(device)
+        if self.args.task != "singlelabel":
+            m = torch.nn.Sigmoid().to(device)
+        else:
+            m = torch.nn.Softmax(dim=1).to(device)
         with torch.no_grad():
             images = images.to(device)
             logits, attn = model(images, return_attn=True)

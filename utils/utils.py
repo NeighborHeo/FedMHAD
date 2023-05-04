@@ -89,7 +89,9 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
             if args.task == 'singlelabel' : 
-                loss = criterion(net(images), labels)
+                outputs = net(images)
+                outputs = torch.nn.Softmax(dim=1)(outputs)
+                loss = criterion(outputs, labels)
             else:
                 loss = criterion(net(images), labels.float())
             loss.backward()
@@ -116,7 +118,11 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
         criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     correct, loss = 0, 0.0
     net.eval()
-    m = torch.nn.Sigmoid().to(device)
+
+    if args.task != 'singlelabel':
+        m = torch.nn.Sigmoid().to(device)
+    else:
+        m = torch.nn.Softmax(dim=1).to(device)
     output_list = []
     target_list = []
     total = 0
@@ -166,8 +172,10 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.train()
-
-    criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
+    if args.task == 'singlelabel' :
+        criterion = torch.nn.KLDivLoss().to(device)
+    else:
+        criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
@@ -175,7 +183,11 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    m = torch.nn.Sigmoid().to(device)
+    if args.task != 'singlelabel':
+        m = torch.nn.Sigmoid().to(device)
+    else:
+        m = torch.nn.Softmax(dim=1).to(device)
+        
     for epoch in range(args.local_epochs):
         running_loss = 0.0
         for i, (inputs, _) in enumerate(publicLoader):
@@ -196,8 +208,10 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.train()
-
-    criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
+    if args.task == 'singlelabel' :
+        criterion = torch.nn.KLDivLoss().to(device)
+    else:
+        criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     criterion2 = MHALoss().to(device)
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
@@ -206,7 +220,10 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    m = torch.nn.Sigmoid().to(device)
+    if args.task != 'singlelabel':
+        m = torch.nn.Sigmoid().to(device)
+    else:
+        m = torch.nn.Softmax(dim=1).to(device)
     images = images.to(device)
     optimizer.zero_grad()
     outputs, attns = model(images, return_attn=True)

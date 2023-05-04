@@ -210,7 +210,10 @@ class FedDF(FedAvg):
         model.eval()
 
         logits_list = []
-        m = torch.nn.Sigmoid()
+        if self.args.task != "singlelabel":
+            m = torch.nn.Sigmoid().to(device)
+        else:
+            m = torch.nn.Softmax(dim=1).to(device)
         with torch.no_grad():
             for inputs, _ in tqdm(publicLoader):
                 inputs = inputs.to(device)
