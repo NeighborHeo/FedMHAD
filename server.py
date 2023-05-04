@@ -165,6 +165,12 @@ def init_comet_experiment(args: argparse.Namespace):
     experiment.add_tag(args.strategy)
     experiment.add_tag(args.model_name)
     experiment.set_name(f"global_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
+    # class Experiment():
+    #     def log_metrics(self, result: Dict[str, float], step: int):
+    #         pass
+    #     def end(self):
+    #         pass
+    # experiment = Experiment()
     return experiment
 
 def main() -> None:

@@ -16,6 +16,7 @@ import utils
 import datasets
 import models
 import config
+import copy
 
 warnings.filterwarnings("ignore")
 
@@ -35,6 +36,8 @@ class CustomClient(fl.client.NumPyClient):
         self.args = args
         self.save_path = f"checkpoints/{args.port}/client_{args.index}_best_models"
         self.early_stopper = utils.EarlyStopper(patience=10, delta=1e-4, checkpoint_dir=self.save_path)
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
+        self.model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
         self.trainset = None
         self.testset = None
         self.class_counts = None
@@ -70,7 +73,7 @@ class CustomClient(fl.client.NumPyClient):
     def set_parameters(self, parameters):
         """Loads a efficientnet model and replaces it parameters with the ones
         given."""
-        model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained) 
+        model = copy.deepcopy(self.model).to(self.device)
         params_dict = zip(model.state_dict().keys(), parameters)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
         # save file 
@@ -100,8 +103,7 @@ class CustomClient(fl.client.NumPyClient):
         trainLoader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
         valLoader = DataLoader(valset, batch_size=batch_size)
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
-        results = utils.train(model, trainLoader, valLoader, epochs, device, self.args)
+        results = utils.train(model, trainLoader, valLoader, epochs, self.device, self.args)
         
         accuracy = results["val_accuracy"]
         loss = results["val_loss"]
@@ -138,8 +140,7 @@ class CustomClient(fl.client.NumPyClient):
         # Evaluate global model parameters on the local test data and return results
         testloader = DataLoader(self.testset, batch_size=16)
 
-        device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
-        result = utils.test(model, testloader, steps, device, self.args)
+        result = utils.test(model, testloader, steps, self.device, self.args)
         accuracy = result["acc"]
         loss = result["loss"]
         result = {f"test_" + k: v for k, v in result.items()}

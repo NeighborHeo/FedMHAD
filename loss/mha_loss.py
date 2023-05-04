@@ -158,14 +158,21 @@ class MHALoss(torch.nn.Module):
         # assert len(clients_output) == self.num_clients, "Number of clients_output should match num_clients"
         num_clients = client_attentions.shape[0]
         loss = 0
+        ssim = []
+        ssim2 = []
         for i in range(num_clients):
             img1 = client_attentions[i]
             img2 = central_attention
             ssim_loss = self.ssim_loss(img1, img2)
+            ssim.append(ssim_loss)
             loss += self.weight[i] * ssim_loss            
+            ssim2.append(self.weight[i] * ssim_loss)
             # cosine_sim = self.cosine_similarity(client_attentions[i].contiguous().view(-1), central_attention.contiguous().view(-1))
             # loss += self.weight[i] * (1 - cosine_sim).mean()
         loss /= num_clients
+        print('SSIM Loss : ', ssim)
+        print('Losses : ', ssim2)
+        print('MHA Loss : ', loss)
         # print('MHA Loss : ', loss)
         return loss
 

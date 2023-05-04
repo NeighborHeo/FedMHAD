@@ -116,7 +116,7 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
         criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     correct, loss = 0, 0.0
     net.eval()
-    m = torch.nn.Sigmoid()
+    m = torch.nn.Sigmoid().to(device)
     output_list = []
     target_list = []
     total = 0
@@ -175,7 +175,7 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    m = torch.nn.Sigmoid()
+    m = torch.nn.Sigmoid().to(device)
     for epoch in range(args.local_epochs):
         running_loss = 0.0
         for i, (inputs, _) in enumerate(publicLoader):
@@ -206,14 +206,16 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    m = torch.nn.Sigmoid()
+    m = torch.nn.Sigmoid().to(device)
     images = images.to(device)
     optimizer.zero_grad()
     outputs, attns = model(images, return_attn=True)
     outputs = m(outputs)
     loss = criterion(outputs, ensembled_logits.to(device))
+    print(f"sim_weights: {sim_weights}")
     loss2 = criterion2(total_attns.to(device), attns, sim_weights)
     lambda_ = 0.09
+    print(f"Distillation Loss: {loss.item()}, Attention Loss: {loss2.item()}")
     total_loss = (1-lambda_) * loss + lambda_ * loss2
     total_loss.backward()
     optimizer.step()

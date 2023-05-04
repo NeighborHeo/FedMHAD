@@ -199,7 +199,8 @@ class FedMHAD(FedAvg):
         return fedavg_model
     
     def load_parameter(self, model: torch.nn.Module, parameters: NDArrays)-> torch.nn.Module:
-        state_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(model.state_dict().keys(), parameters)})
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        state_dict = OrderedDict({k: torch.tensor(v).to(device) for k, v in zip(model.state_dict().keys(), parameters)})
         model.load_state_dict(state_dict, strict=True)
         return model
 
@@ -214,8 +215,9 @@ class FedMHAD(FedAvg):
         model.eval()
         logits_list = []
         total_attns = []
-        m = torch.nn.Sigmoid()
+        m = torch.nn.Sigmoid().to(device)
         with torch.no_grad():
+            images = images.to(device)
             logits, attn = model(images, return_attn=True)
             logits_list.append(m(logits).detach())
             total_attns.append(attn.detach())
@@ -245,11 +247,12 @@ class FedMHAD(FedAvg):
                 logits, attns = self.__get_logits_and_attns(copied_model, images)
                 logits_list.append(logits)
                 attns_list.append(attns)
-            total_logits = torch.stack(logits_list, dim=0)
-            total_attns = torch.stack(attns_list, dim=0)
+            total_logits = torch.stack(logits_list, dim=0).to(device)
+            total_attns = torch.stack(attns_list, dim=0).to(device)
+            
             ensembled_logits = utils.compute_ensemble_logits(total_logits, logit_weights)
             sim_weights = utils.calculate_normalized_similarity_weights(ensembled_logits, total_logits, "cosine")
-            distilled_model = utils.distill_with_logits_n_attns(fedavg_model, ensembled_logits, total_attns, sim_weights, images, self.args)
+            fedavg_model = utils.distill_with_logits_n_attns(fedavg_model, ensembled_logits, total_attns, sim_weights, images, self.args)
 
-        distilled_parameters = [val.cpu().numpy() for _, val in distilled_model.state_dict().items()]
+        distilled_parameters = [val.cpu().numpy() for _, val in fedavg_model.state_dict().items()]
         return distilled_parameters
