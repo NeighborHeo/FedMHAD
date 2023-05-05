@@ -203,7 +203,7 @@ class FedDF(FedAvg):
         """Get the number of classes from the class dictionary."""
         return torch.tensor([max(1, int(class_dict[str(i)])) for i in range(self.args.num_classes)])
 
-    def __get_logits(self, model: torch.nn.Module, publicLoader: DataLoader) -> torch.Tensor:
+    def __get_logits(self, model: torch.nn.Module, images: torch.Tensor) -> torch.Tensor:
         """Infer logits from the given model."""
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model.to(device)
@@ -215,44 +215,35 @@ class FedDF(FedAvg):
         else:
             m = torch.nn.Softmax(dim=1).to(device)
         with torch.no_grad():
-            for inputs, _ in tqdm(publicLoader):
-                inputs = inputs.to(device)
-                logits = model(inputs)
-                logits_list.append(m(logits).detach())
+            images = images.to(device)
+            logits = model(images)
+            # logits_list.append(m(logits).detach())
+            logits_list.append(logits.detach())
         return torch.cat(logits_list, dim=0)
 
     def fit_aggregation_fn(self, results: List[Tuple[ClientProxy, FitRes]]) -> Parameters:
         """Aggregate the results of the training rounds."""
-
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        
         # Step 1: Get the logits from all the models
         publicLoader = self.__check_n_load_public_loader()
         fedavg_model = self.__get_fedavg_model(results)
 
-        logits_list = []
-        class_counts = []
-        for _, fit_res in tqdm(results):
-            copied_model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
-            copied_model = self.load_parameter(copied_model, parameters_to_ndarrays(fit_res.parameters))
-            logits = self.__get_logits(copied_model, publicLoader)
-            logits_list.append(logits)
-            class_counts.append(self.__get_class_count_from_dict(fit_res.metrics))
-        total_logits = torch.stack(logits_list, dim=0)
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        class_counts = torch.stack(class_counts, dim=0).to(device)
-        print("total_logits", total_logits)
-        # Step 2: Ensemble logits
+        model_weights_list = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results]
+        class_counts = torch.stack([self.__get_class_count_from_dict(fit_res.metrics) for _, fit_res in results], dim=0).to(device)
         logit_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
-        if torch.isnan(logit_weights).any():
-            print("logit_weights is nan", logit_weights)
-        print("total_logits", total_logits.device, "logit_weights", logit_weights.device)
-        ensembled_logits = utils.compute_ensemble_logits(total_logits, logit_weights)
-        if torch.isnan(ensembled_logits).any():
-            print("ensembled_logits is nan", ensembled_logits)
-        print("ensembled_logits", ensembled_logits)
-        print("total_logits", ensembled_logits.device, "ensembled_logits", ensembled_logits.device)
+        copied_model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        
+        for i, (images, _) in tqdm(enumerate(publicLoader)):
+            images = images.to(device)
+            logits_list = []
+            copied_model = copy.deepcopy(fedavg_model)
+            for j, model_weights in enumerate(model_weights_list):
+                copied_model = self.load_parameter(copied_model, model_weights)
+                logits = self.__get_logits(copied_model, images)
+                logits_list.append(logits)
+            total_logits = torch.stack(logits_list, dim=0).to(device)
+            ensembled_logits = utils.compute_ensemble_logits(total_logits, logit_weights)
+            fedavg_model = utils.distill_with_logits(fedavg_model, ensembled_logits, images, self.args)
 
-        # Step 3: Distill logits
-        distilled_model = utils.distill_with_logits(fedavg_model, ensembled_logits, publicLoader, self.args)
-        distilled_parameters = [val.cpu().numpy() for _, val in distilled_model.state_dict().items()]
-
-        return distilled_parameters
+        return [val.cpu().numpy() for _, val in fedavg_model.state_dict().items()]

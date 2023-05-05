@@ -15,7 +15,7 @@ import warnings
 import unittest
 from tqdm import tqdm
 
-from loss import MHALoss
+from loss import MHALoss, kl_loss
 
 warnings.filterwarnings("ignore")
 
@@ -167,13 +167,13 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
         net.to("cpu")  # move model back to CPU        
         return {"loss": loss, "accuracy": accuracy, "acc": acc, "top_k": top_k, "mAP": mAP}
 
-def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, publicLoader: DataLoader, args: argparse.Namespace) -> torch.nn.Module:
+def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, images: torch.Tensor, args: argparse.Namespace) -> torch.nn.Module:
     """Perform distillation training."""
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model.to(device)
     model.train()
     if args.task == 'singlelabel' :
-        criterion = torch.nn.KLDivLoss().to(device)
+        criterion = kl_loss(T=3, singlelabel=True).to(device)
     else:
         criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     last_layer_name = list(model.named_children())[-1][0]
@@ -188,19 +188,14 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     else:
         m = torch.nn.Softmax(dim=1).to(device)
         
-    for epoch in range(args.local_epochs):
-        running_loss = 0.0
-        for i, (inputs, _) in enumerate(publicLoader):
-            inputs = inputs.to(device)
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            outputs = m(outputs)
-            loss = criterion(outputs, ensembled_logits[i * args.batch_size:(i + 1) * args.batch_size].to(device))
-            lambda_ = 0.09
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-        print(f"Distillation Epoch {epoch + 1}/{args.local_epochs}, Loss: {running_loss / len(publicLoader)}")
+    images = images.to(device)
+    optimizer.zero_grad()
+    outputs = model(images)
+    # outputs = m(outputs)
+    loss = criterion(outputs, ensembled_logits.to(device))
+    loss.backward()
+    optimizer.step()
+    print(f"Loss: {loss.item()}")
     return model
 
 def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.Tensor, total_attns: torch.Tensor, sim_weights: torch.Tensor, images: torch.Tensor, args: argparse.Namespace) -> torch.nn.Module:
