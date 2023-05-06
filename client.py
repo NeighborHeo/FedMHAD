@@ -38,14 +38,21 @@ class CustomClient(fl.client.NumPyClient):
         self.early_stopper = utils.EarlyStopper(patience=10, delta=1e-4, checkpoint_dir=self.save_path)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
         self.model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
-        self.trainset = None
-        self.testset = None
+        self.trainLoader = None
+        self.valLoader = None
+        self.testLoader = None
         self.class_counts = None
         
     def __check_n_load_dataset(self):
-        if self.trainset is None or self.testset is None:
-            self.trainset, self.testset = self.__load_dataset()
-            self.class_counts = self.__getClassCounts(self.trainset, num_classes=self.args.num_classes)
+        if self.trainLoader is None or self.valLoader is None or self.testLoader is None:
+            trainset, testset = self.__load_dataset()
+            valset_index = np.random.choice(range(len(trainset)), int(len(trainset) * self.validation_split), replace=False)
+            valset = torch.utils.data.Subset(trainset, valset_index)
+            trainset = torch.utils.data.Subset(trainset, list(set(range(len(trainset))) - set(valset_index)))
+            self.trainLoader = DataLoader(trainset, batch_size=self.args.batch_size, shuffle=True)
+            self.valLoader = DataLoader(valset, batch_size=self.args.batch_size)
+            self.testLoader = DataLoader(testset, batch_size=self.args.batch_size)
+            self.class_counts = self.__getClassCounts(trainset, num_classes=self.args.num_classes)
     
     def __load_dataset(self):
         print("Loading dataset...")
@@ -93,17 +100,7 @@ class CustomClient(fl.client.NumPyClient):
         epochs: int = config["local_epochs"]
         server_round: int = config["server_round"]
 
-        n_valset = int(len(self.trainset) * self.validation_split)
-
-        valset = torch.utils.data.Subset(self.trainset, range(0, n_valset))
-        trainset = torch.utils.data.Subset(
-            self.trainset, range(n_valset, len(self.trainset))
-        )
-
-        trainLoader = DataLoader(trainset, batch_size=batch_size, shuffle=True)
-        valLoader = DataLoader(valset, batch_size=batch_size)
-
-        results = utils.train(model, trainLoader, valLoader, epochs, self.device, self.args)
+        results = utils.train(model, self.trainLoader, self.valLoader, epochs, self.device, self.args)
         
         accuracy = results["val_accuracy"]
         loss = results["val_loss"]
@@ -138,9 +135,7 @@ class CustomClient(fl.client.NumPyClient):
         server_round: int = config["server_round"]
 
         # Evaluate global model parameters on the local test data and return results
-        testloader = DataLoader(self.testset, batch_size=16)
-
-        result = utils.test(model, testloader, steps, self.device, self.args)
+        result = utils.test(model, self.testloader, steps, self.device, self.args)
         accuracy = result["acc"]
         loss = result["loss"]
         result = {f"test_" + k: v for k, v in result.items()}

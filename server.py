@@ -32,7 +32,7 @@ class ServerManager:
         self.save_path = f"checkpoints/{args.port}/global"
         self.early_stopper = utils.EarlyStopper(patience=10, delta=1e-4, checkpoint_dir=self.save_path)
         self.strategy = self.create_strategy(model, args.toy)
-        self.valLoader = None
+        self.testloader = None
 
     def fit_config(self, server_round: int) -> Dict[str, int]:
         return {
@@ -42,20 +42,20 @@ class ServerManager:
         }
 
     def evaluate_config(self, server_round: int) -> Dict[str, int]:
-        val_steps = 5 if server_round < 4 else 10
+        test_steps = 5 if server_round < 4 else 10
         return {
-            "val_steps": val_steps, 
+            "test_steps": test_steps, 
             "server_round": server_round
         }
 
-    def __check_n_load_val_loader(self):
-        if self.valLoader is not None:
-            return self.valLoader
+    def __check_n_load_test_loader(self):
+        if self.testloader is not None:
+            return self.testloader
         
-        self.valLoader = self.__load_val_loader()
-        return self.valLoader
+        self.testloader = self.__load_test_loader()
+        return self.testloader
     
-    def __load_val_loader(self):
+    def __load_test_loader(self):
         print("Loading val loader...")
         if self.args.dataset == "pascal_voc":
             partition = datasets.PascalVocPartition(args=self.args)
@@ -76,12 +76,12 @@ class ServerManager:
             parameters: fl.common.NDArrays,
             config: Dict[str, fl.common.Scalar],
         ) -> Optional[Tuple[float, Dict[str, fl.common.Scalar]]]:
-            val_loader = self.__check_n_load_val_loader()
+            testloader = self.__check_n_load_test_loader()
             state_dict = OrderedDict({k: torch.tensor(v) for k, v in zip(model.state_dict().keys(), parameters)})
             model.load_state_dict(state_dict, strict=True)
 
             device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
-            result = utils.test(model, val_loader, device=device, args=self.args)
+            result = utils.test(model, testloader, device=device, args=self.args)
             accuracy = result["acc"]
             loss = result["loss"]
             
