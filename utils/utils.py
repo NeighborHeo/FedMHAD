@@ -65,7 +65,7 @@ def load_partition(idx: int):
 
 def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
     """Train the network on the training set."""
-    print("Starting training...")
+    print(f"Starting training using {device}...")
     net.to(device)  # move model to GPU if available
     if args.task == 'singlelabel' : 
         criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -89,15 +89,11 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
             if args.task == 'singlelabel' : 
-                outputs = net(images)
-                outputs = torch.nn.Softmax(dim=1)(outputs)
-                loss = criterion(outputs, labels)
+                loss = criterion(net(images), labels)
             else:
                 loss = criterion(net(images), labels.float())
             loss.backward()
             optimizer.step()
-
-    net.to("cpu")  # move model back to CPU
 
     # train_loss, train_acc = test(net, trainloader)
     results1 = test(net, trainloader, device=device, args=args)
@@ -110,7 +106,7 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
 
 def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
     """Validate the network on the entire test set."""
-    print("Starting evalutation...")
+    print(f"Starting evalutation using {device}...")
     net.to(device)  # move model to GPU if available
     if args.task == 'singlelabel' : 
         criterion = torch.nn.CrossEntropyLoss().to(device)
@@ -134,17 +130,13 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
             output_list.append(m(outputs).cpu().numpy())
             target_list.append(targets.cpu().numpy())
             
+            total += outputs.size(0)
             if args.task == 'singlelabel' :
                 loss += criterion(outputs, targets).item()
             else:
                 loss += criterion(outputs, targets.float()).item()
-            total += outputs.size(0)
-            if args.task == 'singlelabel' :
-                _, predicted = torch.max(outputs.data, axis=1)
-                correct += predicted.eq(targets).sum().item()
-            else:
-                predicted = torch.sigmoid(outputs) > 0.5
-                correct += predicted.eq(targets).all(axis=1).sum().item()
+                # predicted = torch.sigmoid(outputs) > 0.5
+                # correct += predicted.eq(targets).all(axis=1).sum().item()
                 
             if steps is not None and batch_idx == steps:
                 break
@@ -153,19 +145,22 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
     target = np.concatenate(target_list, axis=0)
     if args.task == 'singlelabel' :
         acc = compute_single_accuracy(output, target)
-        loss /= len(testloader.dataset)
-        accuracy = correct / len(testloader.dataset)
-        net.to("cpu")  # move model back to CPU
+        loss /= total
+        _, predicted = torch.max(torch.from_numpy(output), axis=1)
+        correct += predicted.eq(torch.from_numpy(target)).sum().item()
+        accuracy = correct / total
+        loss, accuracy, acc = round(loss, 4), round(accuracy, 4), round(acc, 4)
         return {"loss": loss, "accuracy": accuracy, "acc": acc}
     else:
         acc, = compute_multi_accuracy(output, target)
         top_k = multi_label_top_margin_k_accuracy(target, output, margin=0)
         mAP, _ = compute_mean_average_precision(target, output)
         acc, top_k, mAP = round(acc, 4), round(top_k, 4), round(mAP, 4)
-        loss /= len(testloader.dataset)
-        accuracy = correct / len(testloader.dataset)
-        net.to("cpu")  # move model back to CPU        
-        return {"loss": loss, "accuracy": accuracy, "acc": acc, "top_k": top_k, "mAP": mAP}
+        loss /= total
+        predicted = torch.sigmoid(torch.from_numpy(output)) > 0.5
+        correct += predicted.eq(torch.from_numpy(target)).all(axis=1).sum().item()
+        accuracy = correct / total   
+        return {"loss": loss, "acc": acc, "top_k": top_k, "mAP": mAP}
 
 def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, images: torch.Tensor, args: argparse.Namespace) -> torch.nn.Module:
     """Perform distillation training."""
