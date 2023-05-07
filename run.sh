@@ -20,7 +20,7 @@ GPU_ID=0
 # python -c "from torchvision.datasets import CIFAR10; CIFAR10('~/.data', download=True)"
 
 # Download the EfficientNetB0 model
-python -c "import torch; torch.hub.load( 'NVIDIA/DeepLearningExamples:torchhub', 'nvidia_efficientnet_b0', pretrained=True)"
+# python -c "import torch; torch.hub.load( 'NVIDIA/DeepLearningExamples:torchhub', 'nvidia_efficientnet_b0', pretrained=True)"
 
 echo "Starting server"
 CUDA_VISIBLE_DEVICES=$GPU_ID python server.py \

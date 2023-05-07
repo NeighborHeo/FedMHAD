@@ -247,10 +247,13 @@ def compute_ensemble_logits(client_logits, class_weights):
     Returns:
         ensemble_logits (torch.Tensor): (batch_size, num_classes)
     """
-    weighted_logits = client_logits * class_weights.unsqueeze(1)  # (num_samples, batch_size, num_classes)
-    sum_weighted_logits = torch.sum(weighted_logits, dim=0)  # (batch_size, num_classes)
-    sum_weights = torch.sum(class_weights, dim=0)  # (num_classes)
-    ensemble_logits = sum_weighted_logits / sum_weights
+    if class_weights == None:
+        ensemble_logits = torch.mean(client_logits, dim=0)  # (batch_size, num_classes)
+    else:
+        weighted_logits = client_logits * class_weights.unsqueeze(1)  # (num_samples, batch_size, num_classes)
+        sum_weighted_logits = torch.sum(weighted_logits, dim=0)  # (batch_size, num_classes)
+        sum_weights = torch.sum(class_weights, dim=0)  # (num_classes)
+        ensemble_logits = sum_weighted_logits / sum_weights
     return ensemble_logits
 
 def get_ensemble_logits(total_logits, selectN, logits_weights):
