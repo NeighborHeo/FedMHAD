@@ -41,6 +41,7 @@ class CustomClient(fl.client.NumPyClient):
         self.trainLoader = None
         self.valLoader = None
         self.testLoader = None
+        self.num_examples_train = None
         self.class_counts = None
         
     def __check_n_load_dataset(self):
@@ -52,6 +53,8 @@ class CustomClient(fl.client.NumPyClient):
             self.trainLoader = DataLoader(trainset, batch_size=self.args.batch_size, shuffle=True)
             self.valLoader = DataLoader(valset, batch_size=self.args.batch_size)
             self.testLoader = DataLoader(testset, batch_size=self.args.batch_size)
+            self.num_examples_train = len(trainset)
+            self.num_examples_test = len(testset)
             self.class_counts = self.__getClassCounts(trainset, num_classes=self.args.num_classes)
     
     def __load_dataset(self):
@@ -117,10 +120,9 @@ class CustomClient(fl.client.NumPyClient):
             self.experiment.log_metrics(results, step=server_round)
         
         parameters_prime = utils.get_model_params(model)
-        num_examples_train = len(trainset)
         
         results.update(self.class_counts)
-        return parameters_prime, num_examples_train, results
+        return parameters_prime, self.num_examples_train, results
 
     def evaluate(self, parameters, config):
         """Evaluate parameters on the locally held test set."""
@@ -131,17 +133,17 @@ class CustomClient(fl.client.NumPyClient):
         model = self.set_parameters(parameters)
 
         # Get config values
-        steps: int = config["val_steps"]
+        steps: int = config["test_steps"]
         server_round: int = config["server_round"]
 
         # Evaluate global model parameters on the local test data and return results
-        result = utils.test(model, self.testloader, steps, self.device, self.args)
+        result = utils.test(model, self.testLoader, steps, self.device, self.args)
         accuracy = result["acc"]
         loss = result["loss"]
         result = {f"test_" + k: v for k, v in result.items()}
         
         self.experiment.log_metrics(result, step=server_round)
-        return float(loss), len(self.testset), {"accuracy": float(accuracy)}
+        return float(loss), self.num_examples_test, {"accuracy": float(accuracy)}
 
 
 def client_dry_run(experiment: Optional[Experiment] = None
@@ -161,7 +163,7 @@ def client_dry_run(experiment: Optional[Experiment] = None
         {"batch_size": 16, "local_epochs": 1},
     )
 
-    client.evaluate(utils.get_model_params(model), {"val_steps": 32})
+    client.evaluate(utils.get_model_params(model), {"test_steps": 32})
     print("Dry Run Successful")
 
 def init_comet_experiment(args: argparse.Namespace):
