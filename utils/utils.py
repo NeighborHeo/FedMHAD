@@ -168,7 +168,7 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     model.to(device)
     model.train()
     if args.task == 'singlelabel' :
-        criterion = kl_loss(T=3, singlelabel=True).to(device)
+        criterion = kl_loss(T=0.5, singlelabel=True).to(device)
     else:
         criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     last_layer_name = list(model.named_children())[-1][0]
@@ -199,7 +199,7 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     model.to(device)
     model.train()
     if args.task == 'singlelabel' :
-        criterion = torch.nn.KLDivLoss().to(device)
+        criterion = kl_loss(T=0.5, singlelabel=True).to(device)
     else:
         criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     criterion2 = MHALoss().to(device)
@@ -221,9 +221,10 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     loss = criterion(outputs, ensembled_logits.to(device))
     print(f"sim_weights: {sim_weights}")
     loss2 = criterion2(total_attns.to(device), attns, sim_weights)
-    lambda_ = 0.09
+    # lambda_ = 0.09
     print(f"Distillation Loss: {loss.item()}, Attention Loss: {loss2.item()}")
-    total_loss = (1-lambda_) * loss + lambda_ * loss2
+    # total_loss = (1-lambda_) * loss + lambda_ * loss2
+    total_loss = loss + 100*loss2
     total_loss.backward()
     optimizer.step()
     return model

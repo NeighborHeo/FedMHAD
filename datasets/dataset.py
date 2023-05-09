@@ -160,9 +160,11 @@ class Cifar10Partition:
             train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_train_224_ns_{self.args.noisy}'
             test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_test_224_ns_{self.args.noisy}'
         else:
-            train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_train_224_ap_{self.args.alpha}'
-            test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_test_224_ap_{self.args.alpha}'
+            train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'train'
+            test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'test'
         
+        print("train_folder_path: ", train_folder_path / (f'Party_{i}_y_data.npy' if not self.args.noisy > 0 else f'Party_{i}_y_noisy_data.npy'))
+        print("test_folder_path: ", test_folder_path / f'Party_{i}_X_data.npy')
         if train_folder_path.exists() and test_folder_path.exists():
             self.train_images = np.load(train_folder_path / f'Party_{i}_X_data.npy')
             self.train_labels = np.load(train_folder_path / (f'Party_{i}_y_data.npy' if not self.args.noisy > 0 else f'Party_{i}_y_noisy_data.npy'))

@@ -162,6 +162,9 @@ def init_comet_experiment(args: argparse.Namespace):
         workspace= os.getenv('COMET_WORKSPACE'),
     )
     experiment.log_parameters(args)
+    experiment.log_code(folder="./strategy")
+    experiment.log_code(folder="./utils")
+    experiment.log_code(folder="./datasets")
     experiment.add_tag(args.strategy)
     experiment.add_tag(args.model_name)
     experiment.set_name(f"global_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")

@@ -19,7 +19,7 @@ def init_args(server=True):
     parser.add_argument("--alpha", type=float, default=0.0, required=False, help="alpha")
     parser.add_argument("--noisy", type=float, default=0.03, required=False, help="Percentage of noisy data. Default: 0.0")
     # learning arguments
-    parser.add_argument("--num_rounds", type=int, default=30, required=False, help="Number of rounds to run. Default: 30")
+    parser.add_argument("--num_rounds", type=int, default=40, required=False, help="Number of rounds to run. Default: 30")
     parser.add_argument("--local_epochs", type=int, default=2, required=False, help="Number of local epochs. Default: 2")
     parser.add_argument("--learning_rate", type=float, default=0.00002, required=False, help="Learning rate. Default: 0.00002")
     parser.add_argument("--momentum", type=float, default=0.9, required=False, help="Momentum. Default: 0.9")
@@ -27,6 +27,8 @@ def init_args(server=True):
     parser.add_argument("--batch_size", type=int, default=32, required=False, help="Batch size. Default: 32")
     # server arguments
     parser.add_argument("--strategy", type=str, default="fedmhad", required=False, help="Strategy to use. Default: fedmhad")
+    parser.add_argument("--use_class_weights", type=bool, default=False, required=False, help="Set to true to use class weights. Default: False")
+    parser.add_argument("--multifly_lr_lastlayer", type=float, default=100.0, required=False, help="Multiply learning rate of last layer by this factor. Default: 100.0")
     # client arguments
     if not server:
         parser.add_argument("--index", type=int, default=0, required=False, help="Index of the client")

@@ -105,8 +105,8 @@ class Block(nn.Module):
 
     def forward(self, x, return_attn=False):
         if return_attn:
-            val, attn = self.attn(self.norm1(x), return_attn=True)
-            x = x + self.drop_path1(val)
+            val, attn = self.attn(x, return_attn=True)
+            x = x + self.drop_path1(self.norm1(x))
             x = x + self.drop_path2(self.mlp(self.norm2(x)))
             return x, attn
         else:
@@ -174,8 +174,7 @@ class VisionTransformer(nn.Module):
             nn.init.constant_(m.weight, 1.0)
 
     def forward(self, x, return_attn=False):
-        B = x.shape[0]
-
+        B, C, H, W = x.shape
         x = self.patch_embed(x)
         
         cls_tokens = self.cls_token.expand(B, -1, -1)
@@ -189,6 +188,11 @@ class VisionTransformer(nn.Module):
             # if last block
             if blk == self.blocks[-1]:
                 x, attn = blk(x, return_attn=True)
+                b, h, _, _ = attn.shape
+                H_f, W_f = H // 16, W // 16
+                attn = attn[:, :, 0, 1:].reshape(b, h, -1)
+                attn = attn.reshape(b, h, H_f, W_f)
+                attn = nn.functional.interpolate(attn, scale_factor=16, mode="nearest").detach()
             else:
                 x = blk(x)
         x = self.norm(x)

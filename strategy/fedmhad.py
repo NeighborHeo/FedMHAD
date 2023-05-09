@@ -146,7 +146,6 @@ class FedMHAD(FedAvg):
         return self.publicLoader
     
     def __load_public_loader(self):
-        print("Loading public dataset...")
         if self.args.dataset == "pascal_voc":
             pascal_voc_partition = PascalVocPartition(args=self.args)
             publicset = pascal_voc_partition.load_public_dataset()
@@ -159,7 +158,6 @@ class FedMHAD(FedAvg):
         else:
             publicset = torch.utils.data.Subset(publicset, range(0, n_train))
         publicLoader = DataLoader(publicset, batch_size=self.args.batch_size)
-        print("Public dataset loaded.")
         return publicLoader
     
     def aggregate_fit(
@@ -215,14 +213,10 @@ class FedMHAD(FedAvg):
         model.eval()
         logits_list = []
         total_attns = []
-        if self.args.task != "singlelabel":
-            m = torch.nn.Sigmoid().to(device)
-        else:
-            m = torch.nn.Softmax(dim=1).to(device)
         with torch.no_grad():
             images = images.to(device)
             logits, attn = model(images, return_attn=True)
-            logits_list.append(m(logits).detach())
+            logits_list.append(logits.detach())
             total_attns.append(attn.detach())
         return torch.cat(logits_list, dim=0), torch.cat(total_attns, dim=0)
 
@@ -239,7 +233,6 @@ class FedMHAD(FedAvg):
         logit_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
         copied_model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
 
-        # for e in range(self.args.local_epochs):
         for i, (images, _) in tqdm(enumerate(publicLoader)):
             images = images.to(device)
             logits_list = []
@@ -257,5 +250,4 @@ class FedMHAD(FedAvg):
             sim_weights = utils.calculate_normalized_similarity_weights(ensembled_logits, total_logits, "cosine")
             fedavg_model = utils.distill_with_logits_n_attns(fedavg_model, ensembled_logits, total_attns, sim_weights, images, self.args)
 
-        distilled_parameters = [val.cpu().numpy() for _, val in fedavg_model.state_dict().items()]
-        return distilled_parameters
+        return [val.cpu().numpy() for _, val in fedavg_model.state_dict().items()]

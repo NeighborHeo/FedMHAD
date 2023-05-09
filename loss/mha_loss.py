@@ -170,9 +170,9 @@ class MHALoss(torch.nn.Module):
             # cosine_sim = self.cosine_similarity(client_attentions[i].contiguous().view(-1), central_attention.contiguous().view(-1))
             # loss += self.weight[i] * (1 - cosine_sim).mean()
         loss /= num_clients
-        print('SSIM Loss : ', ssim)
-        print('Losses : ', ssim2)
-        print('MHA Loss : ', loss)
+        # print('SSIM Loss : ', ssim)
+        # print('Losses : ', ssim2)
+        # print('MHA Loss : ', loss)
         # print('MHA Loss : ', loss)
         return loss
 
@@ -193,13 +193,13 @@ class TestMHALoss(unittest.TestCase):
         weight = [0.2, 0.2, 0.2, 0.2, 0.2]
         
         ssim_loss = SSIM_loss()
-        print(central_attention.size())
+        # print(central_attention.size())
         for i in range(n_clients):
             img1 = client_attentions[i]
             img2 = central_attention
             ssim_ = ssim(img1, img2)
             ssim_loss_ = ssim_loss(img1, img2)
-            print(ssim_, ssim_loss_)
+            # print(ssim_, ssim_loss_)
             
     
     def test_compute_attention_similarity_losses(self):
