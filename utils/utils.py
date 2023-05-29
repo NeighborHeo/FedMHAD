@@ -14,6 +14,7 @@ from .metrics import compute_mean_average_precision, multi_label_top_margin_k_ac
 import warnings
 import unittest
 from tqdm import tqdm
+import random
 
 from loss import MHALoss, kl_loss
 
@@ -23,12 +24,13 @@ warnings.filterwarnings("ignore")
 print_func_and_line = lambda: print(f"{os.path.basename(inspect.stack()[1].filename)}::{inspect.stack()[1].function}:{inspect.stack()[1].lineno}")
 
 def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
     torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
     
 def load_data():
     

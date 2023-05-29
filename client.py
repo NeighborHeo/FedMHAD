@@ -18,6 +18,14 @@ import models
 import config
 import copy
 
+import torch.optim as optim
+from torch.utils.data import DataLoader
+import torchmetrics
+
+# Poutyne Model on GPU
+from poutyne import Model
+
+
 warnings.filterwarnings("ignore")
 
 import os
@@ -37,7 +45,7 @@ class CustomClient(fl.client.NumPyClient):
         self.save_path = f"checkpoints/{args.port}/client_{args.index}_best_models"
         self.early_stopper = utils.EarlyStopper(patience=10, delta=1e-4, checkpoint_dir=self.save_path)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
-        self.model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        self.model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
         self.trainLoader = None
         self.valLoader = None
         self.testLoader = None
@@ -63,7 +71,7 @@ class CustomClient(fl.client.NumPyClient):
             cifar10_partition = datasets.Cifar10Partition(self.args)
             trainset, testset = cifar10_partition.load_partition(self.args.index)
         else:
-            pascal_voc_partition = datasets.PascalVocPartition(self.args)
+            pascal_voc_partition = datasets.PascalVocSegmentationPartition(self.args)
             trainset, testset = pascal_voc_partition.load_partition(self.args.index)
         if self.args.toy:
             trainset = torch.utils.data.Subset(trainset, range(10))
@@ -72,10 +80,18 @@ class CustomClient(fl.client.NumPyClient):
         return trainset, testset
     
     def __getClassCounts(self, dataset, num_classes):
+        def get_labels(arr, num_classes):
+            unique_list = np.unique(arr)
+            unique_list = unique_list[unique_list!=0]
+            unique_list.sort()
+            label = np.zeros(num_classes)
+            label[unique_list] = 1
+            return label
+
         if self.args.task == "multilabel":
-            counts = np.sum([dataset[i][1] for i in range(len(dataset))], axis=0)
+            counts = np.sum([get_labels(dataset[i][1].numpy(), num_classes) for i in range(len(dataset))], axis=0)
         else:
-            counts = np.bincount([dataset[i][1] for i in range(len(dataset))], minlength=num_classes)
+            counts = np.bincount([get_labels(dataset[i][1].numpy(), num_classes) for i in range(len(dataset))], minlength=num_classes)
         counts = {str(i): str(counts[i]) for i in range(num_classes)}
         print(f"Class counts : {counts}")
         return counts
@@ -103,9 +119,10 @@ class CustomClient(fl.client.NumPyClient):
         epochs: int = config["local_epochs"]
         server_round: int = config["server_round"]
 
+        self.args.experiment = self.experiment
         results = utils.train(model, self.trainLoader, self.valLoader, epochs, self.device, self.args)
         
-        accuracy = results["val_accuracy"]
+        accuracy = results["val_acc"]
         loss = results["val_loss"]
         is_best_accuracy = self.early_stopper.is_best_accuracy(accuracy)
         if is_best_accuracy:
@@ -138,9 +155,9 @@ class CustomClient(fl.client.NumPyClient):
 
         # Evaluate global model parameters on the local test data and return results
         result = utils.test(model, self.testLoader, steps, self.device, self.args)
-        accuracy = result["acc"]
-        loss = result["loss"]
-        result = {f"test_" + k: v for k, v in result.items()}
+        accuracy = result["test_acc"]
+        loss = result["test_loss"]
+        # result = {f"test_" + k: v for k, v in result.items()}
         
         self.experiment.log_metrics(result, step=server_round)
         return float(loss), self.num_examples_test, {"accuracy": float(accuracy)}
@@ -151,7 +168,7 @@ def client_dry_run(experiment: Optional[Experiment] = None
     """Weak tests to check whether all client methods are working as
     expected."""
     
-    model = models.get_vit_model(args.model_name, args.num_classes, args.pretrained)
+    model = models.get_network(args.model_name, args.num_classes, args.pretrained)
     trainset, testset = utils.load_partition(0)
     trainset = torch.utils.data.Subset(trainset, range(10))
     testset = torch.utils.data.Subset(testset, range(10))
@@ -163,8 +180,8 @@ def client_dry_run(experiment: Optional[Experiment] = None
         {"batch_size": 16, "local_epochs": 1},
     )
 
-    client.evaluate(utils.get_model_params(model), {"test_steps": 32})
-    print("Dry Run Successful")
+#     client.evaluate(utils.get_model_params(model), {"test_steps": 32})
+#     print("Dry Run Successful")
 
 def init_comet_experiment(args: argparse.Namespace):
     experiment = Experiment(
@@ -178,13 +195,13 @@ def init_comet_experiment(args: argparse.Namespace):
     experiment.set_name(f"client_{args.index}_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     return experiment
 
-def test_load_cifar10_partition():
-    args = config.init_args(server=False)
-    cifar10_partition = datasets.Cifar10Partition(args)
-    trainset, testset = cifar10_partition.load_partition(args.index)
-    num_of_data_per_class = cifar10_partition.get_num_of_data_per_class(trainset)
-    print(f"Number of data per class: {num_of_data_per_class}")
-    return num_of_data_per_class
+# def test_load_cifar10_partition():
+#     args = config.init_args(server=False)
+#     cifar10_partition = datasets.Cifar10Partition(args)
+#     trainset, testset = cifar10_partition.load_partition(args.index)
+#     num_of_data_per_class = cifar10_partition.get_num_of_data_per_class(trainset)
+#     print(f"Number of data per class: {num_of_data_per_class}")
+#     return num_of_data_per_class
 
 def main() -> None:
     utils.set_seed(42)

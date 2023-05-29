@@ -38,7 +38,7 @@ class ServerManager:
         return {
             "server_round": server_round,
             "batch_size": 16,
-            "local_epochs": 1 if server_round < 2 else 2,
+            "local_epochs": 1, # if server_round < 2 else 2,
         }
 
     def evaluate_config(self, server_round: int) -> Dict[str, int]:
@@ -58,7 +58,7 @@ class ServerManager:
     def __load_test_loader(self):
         print("Loading val loader...")
         if self.args.dataset == "pascal_voc":
-            partition = datasets.PascalVocPartition(args=self.args)
+            partition = datasets.PascalVocSegmentationPartition(args=self.args)
         elif self.args.dataset == "cifar10":
             partition = datasets.Cifar10Partition(args=self.args)
         _, testset = partition.load_partition(-1)
@@ -81,9 +81,11 @@ class ServerManager:
             model.load_state_dict(state_dict, strict=True)
 
             device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
+            
             result = utils.test(model, testloader, device=device, args=self.args)
-            accuracy = result["acc"]
-            loss = result["loss"]
+            print(f"result: {result}")
+            accuracy = result["test_acc"]
+            loss = result["test_loss"]
             
             is_best_accuracy = self.early_stopper.is_best_accuracy(accuracy)
             if is_best_accuracy:
@@ -95,7 +97,7 @@ class ServerManager:
                 # todo : stop server
                 
             if self.experiment is not None and server_round != 0:
-                result = {f"test_" + k: v for k, v in result.items()}
+                #result = {f"test_" + k: v for k, v in result.items()}
                 self.experiment.log_metrics(result, step=server_round)
                 
             print(f"result: {result}")
@@ -188,7 +190,7 @@ def main() -> None:
     experiment = init_comet_experiment(args)
 
     # Load model
-    model = models.get_vit_model(args.model_name, args.num_classes, args.pretrained)
+    model = models.get_network(args.model_name, args.num_classes, args.pretrained)
     custom_server = ServerManager(model, args, experiment)
     custom_server.start_server(args.port, args.num_rounds)
 

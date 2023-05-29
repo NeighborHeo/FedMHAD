@@ -1,1 +1,2 @@
 from .dataset import Cifar10Partition, PascalVocPartition
+from .dataset_for_segmentation import PascalVocSegmentationPartition

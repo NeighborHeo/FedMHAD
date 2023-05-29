@@ -16,6 +16,7 @@ port=$(python -c "import random; print(random.randint(10000, 65535))")
 echo $port
 
 GPU_ID=0
+num_clients=10
 # Download the CIFAR-10 dataset
 # python -c "from torchvision.datasets import CIFAR10; CIFAR10('~/.data', download=True)"
 
@@ -28,7 +29,7 @@ CUDA_VISIBLE_DEVICES=$GPU_ID python server.py \
     --port "$port" &
 sleep 3  # Sleep for 3s to give the server enough time to start
 
-for i in `seq 0 9`; do
+for i in `seq 0 $((num_clients-1))`; do
     echo "Starting client $i"
     CUDA_VISIBLE_DEVICES=$GPU_ID python client.py \
         --index "$i" \
