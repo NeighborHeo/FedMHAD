@@ -26,7 +26,7 @@ def init_args(server=True):
     parser.add_argument("--weight_decay", type=float, default=1e-5, required=False, help="Weight decay. Default: 1e-5")
     parser.add_argument("--batch_size", type=int, default=16, required=False, help="Batch size. Default: 32")
     # server arguments
-    parser.add_argument("--strategy", type=str, default="fedavg", required=False, help="Strategy to use. Default: fedmhad")
+    parser.add_argument("--strategy", type=str, default="fedmhad", required=False, help="Strategy to use. Default: fedmhad")
     parser.add_argument("--use_class_weights", type=bool, default=False, required=False, help="Set to true to use class weights. Default: False")
     parser.add_argument("--multifly_lr_lastlayer", type=float, default=100.0, required=False, help="Multiply learning rate of last layer by this factor. Default: 100.0")
     # client arguments

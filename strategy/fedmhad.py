@@ -192,7 +192,7 @@ class FedMHAD(FedAvg):
             (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
             for _, fit_res in results
         ]
-        fedavg_model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        fedavg_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
         self.load_parameter(fedavg_model, aggregate(weights_results))
         return fedavg_model
     
@@ -204,7 +204,7 @@ class FedMHAD(FedAvg):
 
     def __get_class_count_from_dict(self, class_dict: Dict[str, Scalar]) -> List[int]:
         """Get the number of classes from the class dictionary."""
-        return torch.tensor([max(1, int(class_dict[str(i)])) for i in range(self.args.num_classes)])
+        return torch.tensor([max(1, int(float(class_dict[str(i)]))) for i in range(self.args.num_classes)])
 
     def __get_logits_and_attns(self, model: torch.nn.Module, images: torch.Tensor) -> torch.Tensor:
         """Infer logits from the given model."""
@@ -231,7 +231,7 @@ class FedMHAD(FedAvg):
         model_weights_list = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results]
         class_counts = torch.stack([self.__get_class_count_from_dict(fit_res.metrics) for _, fit_res in results], dim=0).to(device)
         logit_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
-        copied_model = models.get_vit_model(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        copied_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
 
         for i, (images, _) in tqdm(enumerate(publicLoader)):
             images = images.to(device)
@@ -246,7 +246,7 @@ class FedMHAD(FedAvg):
             total_logits = torch.stack(logits_list, dim=0).to(device)
             total_attns = torch.stack(attns_list, dim=0).to(device)
             
-            ensembled_logits = utils.compute_ensemble_logits(total_logits, logit_weights)
+            ensembled_logits = utils.compute_ensemble_logits(total_logits, None)
             sim_weights = utils.calculate_normalized_similarity_weights(ensembled_logits, total_logits, "cosine")
             fedavg_model = utils.distill_with_logits_n_attns(fedavg_model, ensembled_logits, total_attns, sim_weights, images, self.args)
 

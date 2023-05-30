@@ -1,3 +1,6 @@
 *.pth
 *.pyc
 __pycache__/
+test/
+checkpoints/
+fig/

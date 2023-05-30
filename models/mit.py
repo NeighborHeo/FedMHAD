@@ -90,7 +90,7 @@ class Attention(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, H, W):
+    def forward(self, x, H, W, return_attn=False):
         B, N, C = x.shape
         q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
 
@@ -110,7 +110,9 @@ class Attention(nn.Module):
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
-
+        if return_attn:
+            return x, attn
+        
         return x
 
 
@@ -147,13 +149,17 @@ class Block(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, x, H, W):
+    def forward(self, x, H, W, return_attn=False):
+        if return_attn:
+            x, attn = self.attn(self.norm1(x), H, W, return_attn)
+            x = x + self.drop_path(x)
+            x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
+            return x, attn
+                        
         x = x + self.drop_path(self.attn(self.norm1(x), H, W))
         x = x + self.drop_path(self.mlp(self.norm2(x), H, W))
-
         return x
-
-
+        
 class OverlapPatchEmbed(nn.Module):
     """ Image to Patch Embedding
     """
@@ -308,7 +314,7 @@ class MixVisionTransformer(nn.Module):
         self.num_classes = num_classes
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-    def forward_features(self, x):
+    def forward_features(self, x, return_attn=False):
         B = x.shape[0]
         outs = []
 
@@ -336,20 +342,51 @@ class MixVisionTransformer(nn.Module):
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         outs.append(x)
 
+        # # ------------------------------
+        # attn.shape : torch.Size([16, 3, 197, 197])
+        # b, h : 16 3
+        # H_f, W_f : 14 14
+        # attn.shape : torch.Size([16, 3, 14, 14])
+        # attn.shape : torch.Size([16, 3, 197, 197])
+
+        # attn.shape :  torch.Size([16, 8, 49, 49])
+        # H, W :  7 7
+        # H_f, W_f :  0 0
+        # attn.shape :  torch.Size([16, 8, 48])
+        # # ------------------------------
         # stage 4
         x, H, W = self.patch_embed4(x)
         for i, blk in enumerate(self.block4):
-            x = blk(x, H, W)
+            if blk == self.block4[-1] and return_attn:
+                x, attn = blk(x, H, W, return_attn)
+                # print("attn.shape : ", attn.shape)
+                b, h, _, _ = attn.shape
+                # print("H, W : ", H, W)
+                # H_f, W_f = H // 16, W // 16
+                # print("H_f, W_f : ", H_f, W_f)
+                attn = attn[:, :, 0, :].reshape(b, h, -1)
+                # print("attn.shape : ", attn.shape)
+                attn = attn.reshape(b, h, 7, 7)
+                attn = nn.functional.interpolate(attn, scale_factor=8, mode="nearest").detach()
+                # print("attn.shape : ", attn.shape)
+            else:
+                x = blk(x, H, W)
         x = self.norm4(x)
         x = x.reshape(B, H, W, -1).permute(0, 3, 1, 2).contiguous()
         outs.append(x)
-
+        
+        if return_attn:
+            return outs, attn
         return outs
 
-    def forward(self, x):
-        x = self.forward_features(x)
-        # x = self.head(x)
+    def forward(self, x, return_attn=False):
+        if return_attn:
+            x, attn = self.forward_features(x, return_attn)
+            # x = self.head(x)
+            return x, attn
 
+        x = self.forward_features(x, return_attn)
+        # x = self.head(x)
         return x
     
 

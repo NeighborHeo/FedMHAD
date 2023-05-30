@@ -22,6 +22,7 @@ def get_network(model_name : str, num_classes : int, pretrained : bool = False):
     if model_name == 'segformer': # segformer-b0
         network = SegFormerB0(num_classes=num_classes, encoder_weight=None) # binary classifier
         if pretrained:
+            print("Loading pretrained model...")
             network.load_official_state_dict('segformer.b0.512x512.ade.160k.pth', strict=False) # the final prediction layer is not loaded
     elif model_name == 'unet':
         network = smp.Unet('resnet34', encoder_weights='imagenet', classes=22)

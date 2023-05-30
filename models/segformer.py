@@ -64,8 +64,13 @@ class SegFormer(nn.Module):
                                      embedding_dim=embedding_dim,
                                      dropout_ratio=dropout_ratio
                                      )
-    def forward(self, x):
-        return self.decode_head(self.backbone(x))
+    def forward(self, x, return_attn=False):
+        if return_attn:
+            out, attn = self.backbone(x, return_attn)
+            out = self.decode_head(out)
+            return out, attn
+        else:
+            return self.decode_head(self.backbone(x, return_attn))
 
     def load_official_state_dict(self, filename:str, local_dir:str=None, download:bool=True, strict:bool=True):
         """
