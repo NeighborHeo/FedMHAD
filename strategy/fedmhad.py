@@ -26,7 +26,7 @@ from logging import WARNING
 from typing import Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 from torch.utils.data import DataLoader
-from datasets import PascalVocPartition, Cifar10Partition
+from datasets import PascalVocPartition, Cifar10Partition, PascalVocSegmentationPartition
 import utils
 import models
 import copy
@@ -147,7 +147,7 @@ class FedMHAD(FedAvg):
     
     def __load_public_loader(self):
         if self.args.dataset == "pascal_voc":
-            pascal_voc_partition = PascalVocPartition(args=self.args)
+            pascal_voc_partition = PascalVocSegmentationPartition(args=self.args)
             publicset = pascal_voc_partition.load_public_dataset()
         elif self.args.dataset == "cifar10":
             partition = Cifar10Partition(args=self.args)
@@ -230,7 +230,8 @@ class FedMHAD(FedAvg):
 
         model_weights_list = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results]
         class_counts = torch.stack([self.__get_class_count_from_dict(fit_res.metrics) for _, fit_res in results], dim=0).to(device)
-        logit_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
+        class_counts = torch.where(class_counts==0, torch.ones_like(class_counts), class_counts)
+        # logit_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
         copied_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
 
         for i, (images, _) in tqdm(enumerate(publicLoader)):
@@ -246,7 +247,7 @@ class FedMHAD(FedAvg):
             total_logits = torch.stack(logits_list, dim=0).to(device)
             total_attns = torch.stack(attns_list, dim=0).to(device)
             
-            ensembled_logits = utils.compute_ensemble_logits(total_logits, None)
+            ensembled_logits = utils.compute_ensemble_logits(total_logits, class_counts)
             sim_weights = utils.calculate_normalized_similarity_weights(ensembled_logits, total_logits, "cosine")
             fedavg_model = utils.distill_with_logits_n_attns(fedavg_model, ensembled_logits, total_attns, sim_weights, images, self.args)
 

@@ -223,10 +223,10 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     loss = criterion(outputs, ensembled_logits.to(device))
     print(f"sim_weights: {sim_weights}")
     loss2 = criterion2(total_attns.to(device), attns, sim_weights)
-    # lambda_ = 0.09
+    lambda_ = 0.1
     print(f"Distillation Loss: {loss.item()}, Attention Loss: {loss2.item()}")
-    # total_loss = (1-lambda_) * loss + lambda_ * loss2
-    total_loss = loss + 100*loss2
+    total_loss = (1-lambda_) * loss + lambda_ * loss2
+    # total_loss = loss + 100*loss2
     total_loss.backward()
     optimizer.step()
     return model
@@ -250,13 +250,33 @@ def compute_ensemble_logits(client_logits, class_weights):
     Returns:
         ensemble_logits (torch.Tensor): (batch_size, num_classes)
     """
+    def gumbel_softmax(logits, temperature=1.0):
+        gumbel_noise = torch.rand_like(logits)
+        gumbel_noise = -torch.log(-torch.log(gumbel_noise + 1e-20) + 1e-20)  # Gumbel noise
+        gumbel_softmax = (logits + gumbel_noise) / temperature
+        gumbel_softmax = torch.nn.functional.softmax(gumbel_softmax, dim=2)
+        return gumbel_softmax
+
     if class_weights == None:
         ensemble_logits = torch.mean(client_logits, dim=0)  # (batch_size, num_classes)
     else:
-        weighted_logits = client_logits * class_weights.unsqueeze(1)  # (num_samples, batch_size, num_classes)
-        sum_weighted_logits = torch.sum(weighted_logits, dim=0)  # (batch_size, num_classes)
-        sum_weights = torch.sum(class_weights, dim=0)  # (num_classes)
-        ensemble_logits = sum_weighted_logits / sum_weights
+        logits_shape = client_logits.shape
+        # T = 3
+        # client_logits = torch.softmax(client_logits/T, dim=2)*T
+        # client_logits = gumbel_softmax(client_logits, temperature=0.1)
+        client_logits = torch.softmax(client_logits, dim=2)
+        temp_logits = client_logits # .reshape(logits_shape[0], logits_shape[1], logits_shape[2], -1)  # (num_samples, batch_size, num_classes, -1)
+        class_weights = class_weights.reshape(logits_shape[0], 1, logits_shape[2], 1, 1) # (batch_size, 1, num_classes, 1, 1)
+        class_weights = class_weights/ torch.sum(class_weights, dim=0, keepdim=True)  # (num_samples, 1, num_classes, 1, 1)
+        # if nan in class_weights, then set it to -1
+        class_weights = torch.where(torch.isnan(class_weights), torch.zeros_like(class_weights), class_weights)
+        # class_weights = torch.softmax(class_weights, dim=2)  # (num_samples, 1, num_classes, 1)
+        weighted_logits = temp_logits * class_weights # (num_samples, batch_size, num_classes, 1)
+        weighted_logits = torch.where(torch.isnan(weighted_logits), torch.zeros_like(weighted_logits), weighted_logits)
+        weighted_logits = weighted_logits.reshape(logits_shape) # (num_samples, batch_size, num_classes, h, w)
+        ensemble_logits = torch.sum(weighted_logits, dim=0)  
+        # sum_weights = torch.sum(class_weights, dim=0)  # (num_classes)
+        # ensemble_logits = sum_weighted_logits / sum_weights
     return ensemble_logits
 
 def get_ensemble_logits(total_logits, selectN, logits_weights):

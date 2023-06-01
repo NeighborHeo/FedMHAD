@@ -26,7 +26,7 @@ from logging import WARNING
 from typing import Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 from torch.utils.data import DataLoader
-from datasets import PascalVocPartition, Cifar10Partition
+from datasets import PascalVocPartition, Cifar10Partition, PascalVocSegmentationPartition
 import utils
 import models
 import copy
@@ -145,7 +145,7 @@ class FedDF(FedAvg):
     
     def __load_public_loader(self):
         if self.args.dataset == "pascal_voc":
-            pascal_voc_partition = PascalVocPartition(args=self.args)
+            pascal_voc_partition = PascalVocSegmentationPartition(args=self.args)
             publicset = pascal_voc_partition.load_public_dataset()
         elif self.args.dataset == "cifar10":
             partition = Cifar10Partition(args=self.args)
@@ -232,6 +232,7 @@ class FedDF(FedAvg):
 
         model_weights_list = [parameters_to_ndarrays(fit_res.parameters) for _, fit_res in results]
         class_counts = torch.stack([self.__get_class_count_from_dict(fit_res.metrics) for _, fit_res in results], dim=0).to(device)
+        class_counts = torch.where(class_counts==0, torch.ones_like(class_counts), class_counts)
         logit_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
         copied_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
         
@@ -244,7 +245,7 @@ class FedDF(FedAvg):
                 logits = self.__get_logits(copied_model, images)
                 logits_list.append(logits)
             total_logits = torch.stack(logits_list, dim=0).to(device)
-            ensembled_logits = utils.compute_ensemble_logits(total_logits, None) # logit_weights)
+            ensembled_logits = utils.compute_ensemble_logits(total_logits, logit_weights) # logit_weights)
             fedavg_model = utils.distill_with_logits(fedavg_model, ensembled_logits, images, self.args)
 
         return [val.cpu().numpy() for _, val in fedavg_model.state_dict().items()]

@@ -122,6 +122,7 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     images = images.to(device)
     optimizer.zero_grad()
     outputs, attns = model(images, return_attn=True)
+    outputs = torch.softmax(outputs, dim=1)
     loss = criterion(outputs, ensembled_logits.to(device))
     # print(f"sim_weights: {sim_weights}")
     # print(f"attention shape: {attns.shape}")

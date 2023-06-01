@@ -29,6 +29,8 @@ def init_args(server=True):
     parser.add_argument("--strategy", type=str, default="fedmhad", required=False, help="Strategy to use. Default: fedmhad")
     parser.add_argument("--use_class_weights", type=bool, default=False, required=False, help="Set to true to use class weights. Default: False")
     parser.add_argument("--multifly_lr_lastlayer", type=float, default=100.0, required=False, help="Multiply learning rate of last layer by this factor. Default: 100.0")
+    
+    parser.add_argument("--malicious", type=int, default=1, required=False, help="Number of malicious clients. Default: 0")
     # client arguments
     if not server:
         parser.add_argument("--index", type=int, default=0, required=False, help="Index of the client")
