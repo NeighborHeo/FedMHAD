@@ -137,7 +137,7 @@ class CustomClient(fl.client.NumPyClient):
         server_round: int = config["server_round"]
 
         # Evaluate global model parameters on the local test data and return results
-        result = utils.test(model, self.testLoader, steps, self.device, self.args)
+        result = utils.test(model, self.testLoader, self.device, self.args)
         accuracy = result["acc"]
         loss = result["loss"]
         result = {f"test_" + k: v for k, v in result.items()}

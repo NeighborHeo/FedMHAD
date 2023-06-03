@@ -120,6 +120,19 @@ class ServerManager:
                 initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
                 args = self.args
             )
+        elif self.args.strategy == "fedprox":
+            return fl.server.strategy.FedProx(
+                fraction_fit=1,
+                fraction_evaluate=1,
+                min_fit_clients=10,
+                min_evaluate_clients=10,
+                min_available_clients=10,
+                evaluate_fn=self.get_evaluate_fn(model, toy),
+                on_fit_config_fn=self.fit_config,
+                on_evaluate_config_fn=self.evaluate_config,
+                initial_parameters=fl.common.ndarrays_to_parameters(model_parameters),
+                proximal_mu=0.1
+            )
         elif self.args.strategy == "fedmhad":
             return FedMHAD( 
                 fraction_fit=1,

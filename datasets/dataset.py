@@ -23,6 +23,19 @@ transform_train = transforms.Compose([
                          std=[0.229, 0.224, 0.225])
 ])
 
+mean=[0.485, 0.456, 0.406]
+std=[0.229, 0.224, 0.225]
+transformations_train = transforms.Compose([transforms.ToPILImage(),
+                                transforms.RandomChoice([
+                                    transforms.ColorJitter(brightness=(0.80, 1.20)),
+                                    transforms.RandomGrayscale(p = 0.25)
+                                    ]),
+                                transforms.RandomHorizontalFlip(p = 0.25),
+                                transforms.RandomRotation(25),
+                                transforms.ToTensor(),
+                                transforms.Normalize(mean = mean, std = std),
+                                ])
+
 class mydataset(torch.utils.data.Dataset):
     def __init__(self, imgs, labels, train=False, verbose=False, transforms=None):
         self.img = imgs
@@ -160,8 +173,8 @@ class Cifar10Partition:
             train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_train_224_ns_{self.args.noisy}'
             test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_test_224_ns_{self.args.noisy}'
         else:
-            train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'train'
-            test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'test'
+            train_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_{self.args.num_clients}_224_growing_dirichlet' / 'train'
+            test_folder_path = pathlib.Path(self.args.datapath).expanduser() / 'cifar10' / f'cifar10_{self.args.num_clients}_224_growing_dirichlet' / 'test'
         
         print("train_folder_path: ", train_folder_path / (f'Party_{i}_y_data.npy' if not self.args.noisy > 0 else f'Party_{i}_y_noisy_data.npy'))
         print("test_folder_path: ", test_folder_path / f'Party_{i}_X_data.npy')
@@ -302,13 +315,13 @@ class PascalVocPartition:
             public_imgs = np.load(path.joinpath('coco_img_1_10.npy'))
             public_labels = np.load(path.joinpath('coco_label_1_10.npy'))
         # random sampling 1/10 of the data
-        # public_imgs = (public_imgs.transpose(0, 2, 3, 1)*255.0).round().astype(np.uint8)
-        # print("size of public dataset: ", public_imgs.shape, "images")
-        # public_imgs, public_labels = self.filter_images_by_label_type(self.args.task, public_imgs, public_labels)
-        # public_dataset = mydataset(public_imgs, public_labels, transforms=transformations_train)
+        public_imgs = (public_imgs.transpose(0, 2, 3, 1)*255.0).round().astype(np.uint8)
         print("size of public dataset: ", public_imgs.shape, "images")
         public_imgs, public_labels = self.filter_images_by_label_type(self.args.task, public_imgs, public_labels)
-        public_dataset = mydataset(public_imgs, public_labels)
+        public_dataset = mydataset(public_imgs, public_labels, transforms=transformations_train)
+        # print("size of public dataset: ", public_imgs.shape, "images")
+        # public_imgs, public_labels = self.filter_images_by_label_type(self.args.task, public_imgs, public_labels)
+        # public_dataset = mydataset(public_imgs, public_labels)
         return public_dataset
     
     def filter_images_by_label_type(self, task: str, imgs: np.ndarray, labels: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

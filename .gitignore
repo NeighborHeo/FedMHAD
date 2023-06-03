@@ -1,3 +1,4 @@
 *.pth
 *.pyc
 __pycache__/
+fig/

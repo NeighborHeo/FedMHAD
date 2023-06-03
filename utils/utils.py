@@ -14,6 +14,7 @@ from .metrics import compute_mean_average_precision, multi_label_top_margin_k_ac
 import warnings
 import unittest
 from tqdm import tqdm
+import random
 
 from loss import MHALoss, kl_loss
 
@@ -23,12 +24,13 @@ warnings.filterwarnings("ignore")
 print_func_and_line = lambda: print(f"{os.path.basename(inspect.stack()[1].filename)}::{inspect.stack()[1].function}:{inspect.stack()[1].lineno}")
 
 def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
+    torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
     torch.backends.cudnn.benchmark = False
-    np.random.seed(seed)
+    torch.backends.cudnn.deterministic = True
     
 def load_data():
     
@@ -96,15 +98,15 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
             optimizer.step()
 
     # train_loss, train_acc = test(net, trainloader)
-    results1 = test(net, trainloader, device=device, args=args)
-    results1 = {f"train_{k}": v for k, v in results1.items()}
+    # results1 = test(net, trainloader, device=device, args=args)
+    # results1 = {f"train_{k}": v for k, v in results1.items()}
     # val_loss, val_acc = test(net, valloader)
     results2 = test(net, valloader, device=device, args=args)
     results2 = {f"val_{k}": v for k, v in results2.items()}
-    results = {**results1, **results2}
+    results = {**results2}
     return results
 
-def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
+def test(net, testloader, device: str = "cpu", args=None):
     """Validate the network on the entire test set."""
     print(f"Starting evalutation using {device}...")
     net.to(device)  # move model to GPU if available
@@ -137,9 +139,6 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
                 loss += criterion(outputs, targets.float()).item()
                 # predicted = torch.sigmoid(outputs) > 0.5
                 # correct += predicted.eq(targets).all(axis=1).sum().item()
-                
-            if steps is not None and batch_idx == steps:
-                break
     
     output = np.concatenate(output_list, axis=0)
     target = np.concatenate(target_list, axis=0)
@@ -190,7 +189,7 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     loss = criterion(outputs, ensembled_logits.to(device))
     loss.backward()
     optimizer.step()
-    print(f"Loss: {loss.item()}")
+    # print(f"Loss: {loss.item()}")
     return model
 
 def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.Tensor, total_attns: torch.Tensor, sim_weights: torch.Tensor, images: torch.Tensor, args: argparse.Namespace) -> torch.nn.Module:
@@ -199,32 +198,32 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     model.to(device)
     model.train()
     if args.task == 'singlelabel' :
-        criterion = kl_loss(T=0.5, singlelabel=True).to(device)
+        criterion = kl_loss(T=1, singlelabel=True).to(device)
     else:
         criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
     criterion2 = MHALoss().to(device)
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
-        {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.distill_learning_rate},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.distill_learning_rate*100},
     ]
-    optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
+    optimizer = torch.optim.SGD(params= parameters, lr=args.distill_learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
-    if args.task != 'singlelabel':
-        m = torch.nn.Sigmoid().to(device)
-    else:
-        m = torch.nn.Softmax(dim=1).to(device)
+    # if args.task != 'singlelabel':
+    #     m = torch.nn.Sigmoid().to(device)
+    # else:
+    #     m = torch.nn.Softmax(dim=1).to(device)
     images = images.to(device)
     optimizer.zero_grad()
     outputs, attns = model(images, return_attn=True)
-    outputs = m(outputs)
+    # outputs = m(outputs)
     loss = criterion(outputs, ensembled_logits.to(device))
-    print(f"sim_weights: {sim_weights}")
+    # print(f"sim_weights: {sim_weights}")
     loss2 = criterion2(total_attns.to(device), attns, sim_weights)
     # lambda_ = 0.09
-    print(f"Distillation Loss: {loss.item()}, Attention Loss: {loss2.item()}")
+    # print(f"Distillation Loss: {loss.item()}, Attention Loss: {loss2.item()}")
     # total_loss = (1-lambda_) * loss + lambda_ * loss2
-    total_loss = loss + 100*loss2
+    total_loss = loss + loss2
     total_loss.backward()
     optimizer.step()
     return model
