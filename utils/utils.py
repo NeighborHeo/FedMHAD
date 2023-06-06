@@ -11,6 +11,7 @@ from torchvision.datasets import CIFAR10
 import inspect
 import argparse
 from .metrics import compute_mean_average_precision, multi_label_top_margin_k_accuracy, compute_multi_accuracy, compute_single_accuracy
+from .noisy_label import draw_confusion_matrix
 import warnings
 import unittest
 from tqdm import tqdm
@@ -70,32 +71,53 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
     print(f"Starting training using {device}...")
     net.to(device)  # move model to GPU if available
     if args.task == 'singlelabel' : 
-        criterion = torch.nn.CrossEntropyLoss().to(device)
+        criterion = torch.nn.CrossEntropyLoss(args.class_weights).to(device)
     else:
-        criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
+        criterion = torch.nn.MultiLabelSoftMarginLoss(args.class_weights).to(device)
     
     last_layer_name = list(net.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in net.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     # if args.optim == 'SGD':
     optimizer = torch.optim.SGD( params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
     # else:    
         # optimizer = torch.optim.Adam( params= parameters, lr=args.learning_rate, betas=(args.momentum, 0.999), weight_decay=args.weight_decay)
         
+    if args.task != 'singlelabel':
+        m = torch.nn.Sigmoid().to(device)
+    else:
+        m = torch.nn.Softmax(dim=1).to(device)
+        
     net.train()
+    output_list = []
+    target_list = []
+    loss_list = []
     for i in range(epochs):
         print("Epoch: ", i)
-        for images, labels in tqdm(trainloader):
-            images, labels = images.to(device), labels.to(device)
+        for images, targets in tqdm(trainloader):
+            images, targets = images.to(device), targets.to(device)
             optimizer.zero_grad()
+            outputs = net(images)
+
+            output_list.append(m(outputs).detach().cpu().numpy())
+            target_list.append(targets.cpu().numpy())
             if args.task == 'singlelabel' : 
-                loss = criterion(net(images), labels)
+                loss = criterion(outputs, targets)
             else:
-                loss = criterion(net(images), labels.float())
+                loss = criterion(outputs, targets.float())
             loss.backward()
+            loss_list.append(loss.item())
             optimizer.step()
+    output = np.concatenate(output_list, axis=0)
+    target = np.concatenate(target_list, axis=0)
+    tloss = np.mean(loss_list)
+    if args.task == 'singlelabel' :
+        acc = compute_single_accuracy(output, target)
+    else:
+        acc, opt_th = compute_multi_accuracy(output, target)
+        print("train acc: ", acc, "train_loss: ", tloss, "opt_th: ", opt_th)
 
     # train_loss, train_acc = test(net, trainloader)
     # results1 = test(net, trainloader, device=device, args=args)
@@ -111,9 +133,9 @@ def test(net, testloader, device: str = "cpu", args=None):
     print(f"Starting evalutation using {device}...")
     net.to(device)  # move model to GPU if available
     if args.task == 'singlelabel' : 
-        criterion = torch.nn.CrossEntropyLoss().to(device)
+        criterion = torch.nn.CrossEntropyLoss(args.class_weights).to(device)
     else:
-        criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
+        criterion = torch.nn.MultiLabelSoftMarginLoss(args.class_weights).to(device)
     correct, loss = 0, 0.0
     net.eval()
 
@@ -121,6 +143,7 @@ def test(net, testloader, device: str = "cpu", args=None):
         m = torch.nn.Sigmoid().to(device)
     else:
         m = torch.nn.Softmax(dim=1).to(device)
+        
     output_list = []
     target_list = []
     total = 0
@@ -151,7 +174,8 @@ def test(net, testloader, device: str = "cpu", args=None):
         loss, accuracy, acc = round(loss, 4), round(accuracy, 4), round(acc, 4)
         return {"loss": loss, "accuracy": accuracy, "acc": acc}
     else:
-        acc, = compute_multi_accuracy(output, target)
+        print(f"output: {output.shape}, target: {target.shape}")
+        acc, opt_th = compute_multi_accuracy(output, target)
         top_k = multi_label_top_margin_k_accuracy(target, output, margin=0)
         mAP, _ = compute_mean_average_precision(target, output)
         acc, top_k, mAP = round(acc, 4), round(top_k, 4), round(mAP, 4)
@@ -159,6 +183,13 @@ def test(net, testloader, device: str = "cpu", args=None):
         predicted = torch.sigmoid(torch.from_numpy(output)) > 0.5
         correct += predicted.eq(torch.from_numpy(target)).all(axis=1).sum().item()
         accuracy = correct / total   
+        # draw confusion matrix
+        import pathlib
+        fig_dir = pathlib.Path("./figs") / f"{args.task}_{args.dataset}_{args.model_name}_{args.index}"
+        fig_dir.mkdir(parents=True, exist_ok=True)
+        print(opt_th)
+        fig = draw_confusion_matrix(target, output > opt_th, args.num_classes)
+        fig.savefig(fig_dir / f"confusion_matrix.png")
         return {"loss": loss, "acc": acc, "top_k": top_k, "mAP": mAP}
 
 def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, images: torch.Tensor, args: argparse.Namespace) -> torch.nn.Module:
@@ -169,11 +200,11 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     if args.task == 'singlelabel' :
         criterion = kl_loss(T=0.5, singlelabel=True).to(device)
     else:
-        criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
+        criterion = torch.nn.MultiLabelSoftMarginLoss(args.class_weights).to(device)
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
@@ -200,12 +231,12 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     if args.task == 'singlelabel' :
         criterion = kl_loss(T=1, singlelabel=True).to(device)
     else:
-        criterion = torch.nn.MultiLabelSoftMarginLoss().to(device)
+        criterion = torch.nn.MultiLabelSoftMarginLoss(args.class_weights).to(device)
     criterion2 = MHALoss().to(device)
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.distill_learning_rate},
-        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.distill_learning_rate*100},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.distill_learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.distill_learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
@@ -228,16 +259,16 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     optimizer.step()
     return model
 
-def compute_class_weights(class_counts):
-    """
-    Args:
-        class_counts (torch.Tensor): (num_samples, num_classes)
-    Returns:
-        class_weights (torch.Tensor): (num_samples, num_classes)
-    """
-    # Normalize the class counts per sample
-    class_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
-    return class_weights
+# def compute_class_weights(class_counts):
+#     """
+#     Args:
+#         class_counts (torch.Tensor): (num_samples, num_classes)
+#     Returns:
+#         class_weights (torch.Tensor): (num_samples, num_classes)
+#     """
+#     # Normalize the class counts per sample
+#     class_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
+#     return class_weights
     
 def compute_ensemble_logits(client_logits, class_weights):
     """

@@ -13,7 +13,7 @@ import flwr as fl
 import utils
 import datasets
 import models
-import config
+import configs
 from strategy import FedMHAD, FedDF
 from flwr.common import (parameters_to_ndarrays, ndarrays_to_parameters, FitRes, MetricsAggregationFn, NDArrays, Parameters, Scalar, Config)
 
@@ -59,6 +59,9 @@ class ServerManager:
         print("Loading val loader...")
         if self.args.dataset == "pascal_voc":
             partition = datasets.PascalVocPartition(args=self.args)
+        elif self.args.dataset == "chestxray":
+            partition = datasets.ChestXRayClassificationPartition(args=self.args)
+            self.args.class_weights = partition.get_class_weights()
         elif self.args.dataset == "cifar10":
             partition = datasets.Cifar10Partition(args=self.args)
         _, testset = partition.load_partition(-1)
@@ -68,7 +71,7 @@ class ServerManager:
         else:
             valset = torch.utils.data.Subset(testset, range(0, n_train))
         print("Val loader loaded.")
-        return DataLoader(valset, batch_size=self.args.batch_size)
+        return DataLoader(valset, batch_size=self.args.batch_size, pin_memory=True, num_workers=2)
     
     def get_evaluate_fn(self, model: torch.nn.Module, toy: bool):
         def evaluate(
@@ -195,7 +198,7 @@ def main() -> None:
     2. server-side parameter evaluation
     """
     utils.set_seed(42)
-    args = config.init_args(server=True)
+    args = configs.init_args(server=True)
     
     # Initialize Comet experiment
     experiment = init_comet_experiment(args)

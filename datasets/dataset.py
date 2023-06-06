@@ -16,6 +16,13 @@ import os
 import inspect
 import utils
 
+import torchxrayvision
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+from skmultilearn.model_selection import iterative_train_test_split
+from skmultilearn.model_selection.measures import get_combination_wise_output_matrix
+from sklearn.utils.class_weight import compute_class_weight
+
 transform_train = transforms.Compose([
     transforms.Resize(224),
     transforms.ToTensor(),
@@ -341,6 +348,181 @@ class PascalVocPartition:
             pass
         return imgs, labels
 
+class Custom_RSNA_Dataset(torchxrayvision.datasets.RSNA_Pneumonia_Dataset):
+    def __getitem__(self, index):
+        sample = super().__getitem__(index)
+        img, lab = sample['img'], sample['lab']
+        if img.shape[0] == 1:
+            img = np.repeat(img, 3, axis=0)
+        return img, lab
+
+class Custom_CheX_Dataset(torchxrayvision.datasets.CheX_Dataset):
+    def __getitem__(self, index):
+        sample = super().__getitem__(index)
+        img, lab = sample['img'], sample['lab']
+        if img.shape[0] == 1:
+            img = np.repeat(img, 3, axis=0)
+        return img, lab
+    
+class Custom_NIH_Dataset(torchxrayvision.datasets.NIH_Dataset):
+    def set_clients_index(self, clients_index, alpha):
+        if clients_index is -1:
+            return True
+        
+        self.clients_index = clients_index
+        temp_csv = self.csv.copy()
+        # in case of fine rows client_id == clients_index 
+        temp_csv = temp_csv[temp_csv[f'client_id_{alpha}'] == clients_index]
+        self.csv = temp_csv
+        return True
+    
+    def __getitem__(self, index):
+        sample = super().__getitem__(index)
+        img, lab = sample['img'], sample['lab']
+        if img.shape[0] == 1:
+            img = np.repeat(img, 3, axis=0)
+        return img, lab
+
+class ChestXRayClassificationPartition:
+    def __init__(self, args: argparse.Namespace):
+        self.args = args
+        if args.unique_patients:
+            self.splitdir = pathlib.Path("/home/suncheol/code/FedTest/0_FedMHAD_vit/splitfile/unique_patients/")
+        else:
+            self.splitdir = pathlib.Path("/home/suncheol/code/FedTest/0_FedMHAD_vit/splitfile/no_unique_patients/")
+        
+        self.train_dataset = Custom_NIH_Dataset(imgpath="/home/suncheol/.data/NIH_224/images",
+                                                csvpath= self.splitdir / "NIH_dataset_train.csv",
+                                                views=["PA"], unique_patients=args.unique_patients,
+                                                transform=self.__get_train_transform__(), 
+                                                data_aug=self.__get_data_augmentation__())
+        self.test_dataset = Custom_NIH_Dataset(imgpath="/home/suncheol/.data/NIH_224/images",
+                                                csvpath= self.splitdir / "NIH_dataset_test.csv",
+                                                views=["PA"], unique_patients=args.unique_patients,
+                                                transform=self.__get_train_transform__())
+
+    def __get_x_ray_data__(self, dataset_str, masks=False, unique_patients=False,
+            transform=None, data_aug=None, merge=True, views = ["PA","AP"],
+            pathologies=None):
+        
+        dataset_dir = "/home/suncheol/.data/"      
+        datasets = []
+        
+        if "rsna" in dataset_str:
+            dataset = torchxrayvision.datasets.RSNA_Pneumonia_Dataset(
+                imgpath=dataset_dir + "/kaggle-pneumonia-jpg/stage_2_train_images_jpg",
+                transform=transform, data_aug=data_aug,
+                unique_patients=unique_patients, pathology_masks=masks,
+                views=views)
+            datasets.append(dataset)
+
+        if "nih" in dataset_str:
+            dataset = Custom_NIH_Dataset(
+                imgpath=dataset_dir + "NIH_224/images", 
+                transform=transform, data_aug=data_aug,
+                unique_patients=unique_patients, pathology_masks=masks,
+                views=views)
+            datasets.append(dataset)
+            
+        if "chex" in dataset_str:
+            dataset = torchxrayvision.datasets.CheX_Dataset(
+                imgpath=dataset_dir + "/CheXpert-v1.0-small",
+                csvpath=dataset_dir + "/CheXpert-v1.0-small/train.csv",
+                transform=transform, data_aug=data_aug, 
+                unique_patients=False,
+                views=views)
+            datasets.append(dataset)
+            
+        if not pathologies is None:
+            for d in datasets:
+                torchxrayvision.datasets.relabel_dataset(pathologies, d)
+        
+        if merge:
+            newlabels = set()
+            for d in datasets:
+                newlabels = newlabels.union(d.pathologies)
+
+            print(list(newlabels))
+            for d in datasets:
+                torchxrayvision.datasets.relabel_dataset(list(newlabels), d)
+                
+            dmerge = torchxrayvision.datasets.Merge_Dataset(datasets)
+            return dmerge
+            
+        else:
+            return datasets
+
+    def __get_train_transform__(self):
+        transforms = torchvision.transforms.Compose([
+            torchxrayvision.datasets.XRayCenterCrop(),
+            torchxrayvision.datasets.XRayResizer(224, engine='cv2'),
+        ])
+        return None
+        return transforms
+    
+    def __get_data_augmentation__(self):
+        data_aug = torchvision.transforms.Compose([
+            torchxrayvision.datasets.ToPILImage(),
+            torchvision.transforms.RandomAffine(45, 
+                                                translate=(0.15, 0.15), 
+                                                scale=(0.85, 1.15)),
+            torchvision.transforms.ToTensor()
+        ])
+        return None
+        return data_aug
+    
+    def load_partition(self, partition=-1):
+        if partition >= 0:
+            csv = self.train_dataset.csv
+            indices = csv[csv[f'client_id_{self.args.alpha}'] == partition].index
+            train_dataset = torch.utils.data.Subset(self.train_dataset, indices)
+            n_test = int(len(self.test_dataset) / self.args.num_clients)
+            test_dataset = torch.utils.data.Subset(self.test_dataset, range(partition * n_test, (partition + 1) * n_test))
+        else:
+            train_dataset = self.train_dataset
+            test_dataset = self.test_dataset
+            
+        # print(len(train_dataset), len(test_dataset))
+        return train_dataset, test_dataset
+    
+    def get_class_weights(self):
+        labels = self.train_dataset.labels
+        print(labels.sum(axis=0))
+        class_weights = len(labels) / (len(labels[0]) * labels.sum(axis=0))
+        print(class_weights)
+        return torch.FloatTensor(class_weights)
+
+    def load_public_dataset(self):
+        public_dataset = Custom_RSNA_Dataset(imgpath="/home/suncheol/.data/rsna/stage_2_train_images",
+                                    views=["PA"])
+        return public_dataset
+
+
+class Test_ChestXRayClassificationPartition(unittest.TestCase):
+    def test_load_partition(self):
+        args = argparse.Namespace()
+        args.datapath = '~/.data'
+        args.num_clients = 10
+        args.alpha = 0.1
+        args.task = 'multilabel'
+        args.dataset = 'voc2012'
+        args.batch_size = 16
+        pascal = ChestXRayClassificationPartition(args)
+        train_dataset, test_dataset = pascal.load_partition(0)
+        print(len(train_dataset), len(test_dataset))
+        train_dataset, test_dataset = pascal.load_partition(1)
+        print(len(train_dataset), len(test_dataset))
+        train_dataset, test_dataset = pascal.load_partition(2)
+        print(len(train_dataset), len(test_dataset))
+        train_dataset, test_dataset = pascal.load_partition(-1)
+        print(len(train_dataset), len(test_dataset))  
+
+        public_set = pascal.load_public_dataset()
+        valLoader = DataLoader(test_dataset, batch_size=args.batch_size)
+        img, label = next(iter(valLoader))
+        print(len(public_set))
+        print(label.shape)
+        
 class Test_PascalVocPartition(unittest.TestCase):
     def test_load_partition(self):
         args = argparse.Namespace()

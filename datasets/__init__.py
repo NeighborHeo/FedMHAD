@@ -1,1 +1,1 @@
-from .dataset import Cifar10Partition, PascalVocPartition
+from .dataset import Cifar10Partition, PascalVocPartition, ChestXRayClassificationPartition

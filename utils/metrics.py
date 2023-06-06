@@ -64,10 +64,10 @@ def compute_multi_accuracy(output, target, topk=(1,)):
     acc, pre, rec, f1 = calculateMetrics(target, output, opt_th)
     # print(f"opt_th: {opt_th:.2f}, best_acc: {best_acc:.2f}, pre: {pre:.2f}, rec: {rec:.2f}, f1: {f1:.2f}")
         
-    res = []
-    for k in topk:
-        res.append(acc)
-    return res
+    # res = []
+    # for k in topk:
+    #     res.append(acc)
+    return acc, opt_th
     
 def compute_mean_average_precision(y_true, y_pred_proba):
     if np.any(np.isnan(y_pred_proba)):
@@ -173,7 +173,9 @@ def multi_label_top_margin_k_accuracy(y_true, y_pred_proba, margin=1):
     for i in range(len(y_true)):
         # Calculate k based on the number of true labels plus margin
         k = int(np.sum(y_true[i])) + margin
-        
+        if k == 0:
+            correct.append(np.sum(y_pred_proba[i]) == 0)
+            continue
         # "k must be greater than 0 and less than or equal to the number of classes."
         assert (k > 0 and k <= y_true.shape[1]) 
         # Get the top-k predicted class indices for the sample

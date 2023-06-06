@@ -91,20 +91,21 @@ def draw_confusion_matrix(true_labels, pred_labels, num_classes=20):
 
     if is_multilabel(true_labels):
         cm = multilabel_confusion_matrix(true_labels, pred_labels)
-        plt.figure(figsize=(10, 10))
+        fig = plt.figure(figsize=(10, 10))
+        total_row = int(np.ceil(num_classes / 5))
         for i in range(num_classes):
-            ax = plt.subplot(4, 5, i+1)
+            ax = plt.subplot(total_row, 5, i+1)
             sns.heatmap(cm[i], annot=True, fmt="d", ax=ax)
             plt.title("Confusion matrix")
             plt.ylabel("True label")
             plt.xlabel("Predicted label")
-        plt.show()
     else:
         cm = confusion_matrix(true_labels, pred_labels)
-        plt.figure(figsize=(10, 10))
+        fig = plt.figure(figsize=(10, 10))
         sns.heatmap(cm, annot=True, fmt="d")
         plt.title("Confusion matrix")
         plt.ylabel("True label")
         plt.xlabel("Predicted label")
-        plt.show()
+    
+    return fig
         

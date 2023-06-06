@@ -12,28 +12,30 @@ def init_args(server=True):
     parser.add_argument("--seed", type=int, default=42, required=False, help="seed")
     parser.add_argument("--toy", type=bool, default=False, required=False, help="Set to true to use only 10 datasamples for validation. Useful for testing purposes. Default: False" )
     parser.add_argument("--pretrained", type=bool, default=True, required=False, help="Set to true to use pretrained model. Default: False")
+    parser.add_argument("--in_channels", type=int, default=1, required=False, help="Number of input channels. Default: 3")
+    parser.add_argument("--class_weights", type=list, default=None, required=False, help="Class weights. Default: None")
     # dataset arguments
     parser.add_argument("--num_clients", type=int, default=10, required=False, help="Number of clients to use. Default: 5")
-    parser.add_argument("--dataset", type=str, default="cifar10", required=False, help="Dataset to use. Default: pascal_voc")
+    parser.add_argument("--dataset", type=str, default="chestxray", required=False, help="Dataset to use. Default: pascal_voc")
     parser.add_argument("--datapath", type=str, default="~/.data/", required=False, help="dataset path")
-    parser.add_argument("--alpha", type=float, default=0.03, required=False, help="alpha")
+    parser.add_argument("--alpha", type=float, default=0.1, required=False, help="alpha")
     parser.add_argument("--noisy", type=float, default=0.0, required=False, help="Percentage of noisy data. Default: 0.0")
     # learning arguments
-    parser.add_argument("--num_rounds", type=int, default=100, required=False, help="Number of rounds to run. Default: 30")
+    parser.add_argument("--num_rounds", type=int, default=300, required=False, help="Number of rounds to run. Default: 30")
     parser.add_argument("--local_epochs", type=int, default=2, required=False, help="Number of local epochs. Default: 2")
-    parser.add_argument("--learning_rate", type=float, default=0.00002, required=False, help="Learning rate. Default: 0.00002")
-    parser.add_argument("--learning_rate_min", type=float, default=0.00002, required=False, help="Learning rate. Default: 0.00002")
-    parser.add_argument("--distill_learning_rate", type=float, default=0.00002, required=False, help="Learning rate. Default: 0.00002")
+    parser.add_argument("--learning_rate", type=float, default=0.0001, required=False, help="Learning rate. Default: 0.0001")
+    parser.add_argument("--learning_rate_min", type=float, default=0.0001, required=False, help="Learning rate. Default: 0.0001")
+    parser.add_argument("--distill_learning_rate", type=float, default=0.0001, required=False, help="Learning rate. Default: 0.0001")
     parser.add_argument("--momentum", type=float, default=0.9, required=False, help="Momentum. Default: 0.9")
     parser.add_argument("--weight_decay", type=float, default=1e-5, required=False, help="Weight decay. Default: 1e-5")
     parser.add_argument("--batch_size", type=int, default=32, required=False, help="Batch size. Default: 32")
     # server arguments
-    parser.add_argument("--strategy", type=str, default="fedmhad", required=False, help="Strategy to use. Default: fedmhad")
+    parser.add_argument("--strategy", type=str, default="fedavg", required=False, help="Strategy to use. Default: fedmhad")
     parser.add_argument("--use_class_weights", type=bool, default=False, required=False, help="Set to true to use class weights. Default: False")
-    parser.add_argument("--multifly_lr_lastlayer", type=float, default=100.0, required=False, help="Multiply learning rate of last layer by this factor. Default: 100.0")
+    parser.add_argument("--multifly_lr_lastlayer", type=float, default=5.0, required=False, help="Multiply learning rate of last layer by this factor. Default: 100.0")
     # client arguments
     if not server:
-        parser.add_argument("--index", type=int, default=0, required=False, help="Index of the client")
+        parser.add_argument("--index", type=int, default=-1, required=False, help="Index of the client")
         parser.add_argument("--dry", type=bool, default=False, required=False, help="Set to true to use only 10 datasamples for validation. Useful for testing purposes. Default: False" )
 
     args = parser.parse_args()
@@ -43,4 +45,8 @@ def init_args(server=True):
     elif args.dataset == "cifar10":
         args.num_classes = 10
         args.task = "singlelabel"
-    return args  
+    elif args.dataset == "chestxray":
+        args.num_classes = 14
+        args.task = "multilabel"
+        args.unique_patients = False
+    return args

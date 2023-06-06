@@ -41,7 +41,10 @@ class EarlyStopper:
         
         if self.is_best:
             if self.last_save_path is not None:
-                os.remove(self.last_save_path)
+                try:
+                    os.remove(self.last_save_path)
+                except:
+                    pass
             if filename is None:
                 filename = 'best_model.pth'
             print(f"Best checkpoint at epoch {epoch}, loss: {loss:.4f}, accuracy: {acc:.4f}")

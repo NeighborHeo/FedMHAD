@@ -2,7 +2,7 @@ import os
 import sys
 import argparse
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
-import config
+import configs
 import utils
 import models
 import datasets
@@ -33,7 +33,7 @@ class test_mha_loss(unittest.TestCase):
         file_list.sort()
         # dirnames
         legends = [file.parent.name for file in file_list]
-        args = config.init_args(server=False)
+        args = configs.init_args(server=False)
         args.batch_size = 5
         model = models.get_vit_model(args.model_name, args.num_classes, args.pretrained)
         partition = datasets.Cifar10Partition(args)

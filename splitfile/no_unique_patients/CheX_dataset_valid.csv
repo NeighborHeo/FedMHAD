@@ -1,0 +1,16 @@
+Path,Sex,Age,Frontal/Lateral,AP/PA,No Finding,Enlarged Cardiomediastinum,Cardiomegaly,Lung Opacity,Lung Lesion,Edema,Consolidation,Pneumonia,Atelectasis,Pneumothorax,Pleural Effusion,Pleural Other,Fracture,Support Devices,view,patientid,age_years,sex_male,sex_female
+CheXpert-v1.0-small/valid/patient64542/study1/view1_frontal.jpg,Male,70,Frontal,PA,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,PA,64542,70.0,True,False
+CheXpert-v1.0-small/valid/patient64547/study1/view1_frontal.jpg,Male,59,Frontal,PA,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,PA,64547,59.0,True,False
+CheXpert-v1.0-small/valid/patient64547/study1/view2_frontal.jpg,Male,59,Frontal,PA,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,PA,64547,59.0,True,False
+CheXpert-v1.0-small/valid/patient64560/study1/view1_frontal.jpg,Female,64,Frontal,PA,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,PA,64560,64.0,False,True
+CheXpert-v1.0-small/valid/patient64566/study1/view1_frontal.jpg,Male,58,Frontal,PA,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,PA,64566,58.0,True,False
+CheXpert-v1.0-small/valid/patient64567/study1/view1_frontal.jpg,Male,57,Frontal,PA,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,PA,64567,57.0,True,False
+CheXpert-v1.0-small/valid/patient64570/study1/view1_frontal.jpg,Female,26,Frontal,PA,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,PA,64570,26.0,False,True
+CheXpert-v1.0-small/valid/patient64577/study1/view1_frontal.jpg,Female,72,Frontal,PA,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,PA,64577,72.0,False,True
+CheXpert-v1.0-small/valid/patient64590/study1/view1_frontal.jpg,Female,18,Frontal,PA,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,PA,64590,18.0,False,True
+CheXpert-v1.0-small/valid/patient64597/study1/view1_frontal.jpg,Female,47,Frontal,PA,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,PA,64597,47.0,False,True
+CheXpert-v1.0-small/valid/patient64600/study1/view1_frontal.jpg,Male,62,Frontal,PA,0.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,PA,64600,62.0,True,False
+CheXpert-v1.0-small/valid/patient64606/study1/view1_frontal.jpg,Male,85,Frontal,PA,0.0,1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,PA,64606,85.0,True,False
+CheXpert-v1.0-small/valid/patient64608/study1/view1_frontal.jpg,Male,79,Frontal,PA,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,PA,64608,79.0,True,False
+CheXpert-v1.0-small/valid/patient64613/study1/view1_frontal.jpg,Male,30,Frontal,PA,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,PA,64613,30.0,True,False
+CheXpert-v1.0-small/valid/patient64619/study1/view1_frontal.jpg,Female,83,Frontal,PA,0.0,1.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,1.0,0.0,0.0,0.0,PA,64619,83.0,False,True

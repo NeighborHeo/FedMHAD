@@ -15,7 +15,7 @@ import warnings
 import utils
 import datasets
 import models
-import config
+import configs
 import copy
 
 warnings.filterwarnings("ignore")
@@ -50,9 +50,9 @@ class CustomClient(fl.client.NumPyClient):
             valset_index = np.random.choice(range(len(trainset)), int(len(trainset) * self.validation_split), replace=False)
             valset = torch.utils.data.Subset(trainset, valset_index)
             trainset = torch.utils.data.Subset(trainset, list(set(range(len(trainset))) - set(valset_index)))
-            self.trainLoader = DataLoader(trainset, batch_size=self.args.batch_size, shuffle=True)
-            self.valLoader = DataLoader(valset, batch_size=self.args.batch_size)
-            self.testLoader = DataLoader(testset, batch_size=self.args.batch_size)
+            self.trainLoader = DataLoader(trainset, batch_size=self.args.batch_size, shuffle=True, pin_memory=True, num_workers=2)
+            self.valLoader = DataLoader(valset, batch_size=self.args.batch_size, pin_memory=True, num_workers=2)
+            self.testLoader = DataLoader(testset, batch_size=self.args.batch_size, pin_memory=True, num_workers=2)
             self.num_examples_train = len(trainset)
             self.num_examples_test = len(testset)
             self.class_counts = self.__getClassCounts(trainset, num_classes=self.args.num_classes)
@@ -62,6 +62,11 @@ class CustomClient(fl.client.NumPyClient):
         if self.args.dataset == "cifar10":
             cifar10_partition = datasets.Cifar10Partition(self.args)
             trainset, testset = cifar10_partition.load_partition(self.args.index)
+        elif self.args.dataset == "chestxray":
+            chestxray_partition = datasets.ChestXRayClassificationPartition(self.args)
+            self.args.class_weights = chestxray_partition.get_class_weights()
+            print(f"Class weights : {self.args.class_weights}")
+            trainset, testset = chestxray_partition.load_partition(self.args.index)
         else:
             pascal_voc_partition = datasets.PascalVocPartition(self.args)
             trainset, testset = pascal_voc_partition.load_partition(self.args.index)
@@ -102,10 +107,10 @@ class CustomClient(fl.client.NumPyClient):
         batch_size: int = config["batch_size"]
         epochs: int = config["local_epochs"]
         server_round: int = config["server_round"]
-
+        
         results = utils.train(model, self.trainLoader, self.valLoader, epochs, self.device, self.args)
         
-        accuracy = results["val_accuracy"]
+        accuracy = results["val_acc"]
         loss = results["val_loss"]
         is_best_accuracy = self.early_stopper.is_best_accuracy(accuracy)
         if is_best_accuracy:
@@ -152,19 +157,15 @@ def client_dry_run(experiment: Optional[Experiment] = None
     expected."""
     
     model = models.get_vit_model(args.model_name, args.num_classes, args.pretrained)
-    trainset, testset = utils.load_partition(0)
-    trainset = torch.utils.data.Subset(trainset, range(10))
-    testset = torch.utils.data.Subset(testset, range(10))
-    device = torch.device("cuda:0" if torch.cuda.is_available() and args.use_cuda else "cpu")
-    print("Using device:", device)
-    client = CustomClient(trainset, testset, device, experiment= experiment, args= args)
-    client.fit(
-        utils.get_model_params(model),
-        {"batch_size": 16, "local_epochs": 1},
-    )
-
-    client.evaluate(utils.get_model_params(model), {"test_steps": 32})
-    print("Dry Run Successful")
+    client = CustomClient(validation_split=0.1, experiment= experiment, args= args)
+    epoch = 100
+    for e in range(epoch):
+        parameters_prime, num_examples_train, results = client.fit(
+            utils.get_model_params(model),
+            {"batch_size": 16, "local_epochs": 3, "server_round": e},
+        )
+        model = client.set_parameters(parameters_prime)
+        client.evaluate(utils.get_model_params(model), {"test_steps": 32, "server_round": e})
 
 def init_comet_experiment(args: argparse.Namespace):
     experiment = Experiment(
@@ -179,7 +180,7 @@ def init_comet_experiment(args: argparse.Namespace):
     return experiment
 
 def test_load_cifar10_partition():
-    args = config.init_args(server=False)
+    args = configs.init_args(server=False)
     cifar10_partition = datasets.Cifar10Partition(args)
     trainset, testset = cifar10_partition.load_partition(args.index)
     num_of_data_per_class = cifar10_partition.get_num_of_data_per_class(trainset)
@@ -188,7 +189,7 @@ def test_load_cifar10_partition():
 
 def main() -> None:
     utils.set_seed(42)
-    args = config.init_args(server=False)
+    args = configs.init_args(server=False)
     experiment = init_comet_experiment(args)
     
     if args.dry:

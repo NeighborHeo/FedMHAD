@@ -36,10 +36,11 @@ def get_dirichlet_distribution_count(N_class, N_parties, y_data, alpha=1):
     """
     y_bincount = np.bincount(y_data).reshape(-1, 1)
     dirichlet_arr = get_dirichlet_distribution(N_class, N_parties, alpha)
-    dirichlet_count = (dirichlet_arr * y_bincount).astype(int)
-    return dirichlet_count
+    dirichlet_arr_cumsum = np.cumsum(dirichlet_arr, axis=1)
+    dirichlet_cumsum_count = np.round(dirichlet_arr_cumsum * y_bincount).astype(int)
+    return dirichlet_cumsum_count
 
-def get_split_data_index(y_data, split_count):
+def get_split_data_index(y_data, split_accmul_count):
     """ get split data class index for each party
     Args:
         y_data (array): y_label (num of samples * 1)
@@ -47,16 +48,15 @@ def get_split_data_index(y_data, split_count):
     Returns:
         split_data (dict): {party_id: {class_id: [sample_class_index]}}
     """
-    split_cumsum_index = np.cumsum(split_count, axis=1)
-    N_class = split_cumsum_index.shape[0]
-    N_parties = split_cumsum_index.shape[1]
+    N_class = split_accmul_count.shape[0]
+    N_parties = split_accmul_count.shape[1]
     split_data_index_dict = {}
     for party_id in range(N_parties):
         split_data_index_dict[party_id] = []
         for class_id in range(N_class):
             y_class_index = np.where(np.array(y_data) == class_id)[0]
-            start_index = 0 if party_id == 0 else split_cumsum_index[class_id][party_id-1]
-            end_index = split_cumsum_index[class_id][party_id]
+            start_index = 0 if party_id == 0 else split_accmul_count[class_id][party_id-1]
+            end_index = split_accmul_count[class_id][party_id]
             split_data_index_dict[party_id] += y_class_index[start_index:end_index].tolist()
         print("party_id: {}, num of samples: {}".format(party_id, len(split_data_index_dict[party_id])))
     return split_data_index_dict
