@@ -204,9 +204,9 @@ class VisionTransformer(nn.Module):
         
         return x
 
-    def setExcludedHead(self, excluded_head):
+    def setExcludedHeads(self, excluded_heads):
         for block in self.blocks:
-            block.attn.excluded_heads = excluded_head
+            block.attn.excluded_heads = excluded_heads
 
     def get_class_activation_map(self, x, y):
         targets = None 

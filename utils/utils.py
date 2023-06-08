@@ -77,7 +77,7 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
     last_layer_name = list(net.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in net.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     # if args.optim == 'SGD':
     optimizer = torch.optim.SGD( params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
@@ -176,7 +176,7 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
@@ -208,7 +208,7 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 

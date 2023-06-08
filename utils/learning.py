@@ -25,7 +25,7 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
     last_layer_name = list(net.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in net.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = optim.Adam(parameters, lr=args.learning_rate)
     # scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer, lr_lambda=lambda epoch: 0.99 ** epoch, last_epoch=-1, verbose=False)
@@ -61,7 +61,7 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
     last_layer_name = list(net.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in net.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in net.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = optim.Adam(parameters, lr=args.learning_rate)
 
@@ -91,7 +91,7 @@ def distill_with_logits(model: torch.nn.Module, ensembled_logits: torch.Tensor, 
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
         
@@ -115,14 +115,13 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     last_layer_name = list(model.named_children())[-1][0]
     parameters = [
         {'params': [p for n, p in model.named_parameters() if last_layer_name not in n], 'lr': args.learning_rate},
-        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*100},
+        {'params': [p for n, p in model.named_parameters() if last_layer_name in n], 'lr': args.learning_rate*args.multifly_lr_lastlayer},
     ]
     optimizer = torch.optim.SGD(params= parameters, lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
 
     images = images.to(device)
     optimizer.zero_grad()
     outputs, attns = model(images, return_attn=True)
-    outputs = torch.softmax(outputs, dim=1)
     loss = criterion(outputs, ensembled_logits.to(device))
     # print(f"sim_weights: {sim_weights}")
     # print(f"attention shape: {attns.shape}")

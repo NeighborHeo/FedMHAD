@@ -192,7 +192,7 @@ class FedMHAD(FedAvg):
             (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
             for _, fit_res in results
         ]
-        fedavg_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        fedavg_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained, self.args.excluded_heads)
         self.load_parameter(fedavg_model, aggregate(weights_results))
         return fedavg_model
     
@@ -232,7 +232,7 @@ class FedMHAD(FedAvg):
         class_counts = torch.stack([self.__get_class_count_from_dict(fit_res.metrics) for _, fit_res in results], dim=0).to(device)
         class_counts = torch.where(class_counts==0, torch.ones_like(class_counts), class_counts)
         # logit_weights = class_counts / class_counts.sum(dim=0, keepdim=True)
-        copied_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        copied_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained, self.args.excluded_heads)
 
         for i, (images, _) in tqdm(enumerate(publicLoader)):
             images = images.to(device)

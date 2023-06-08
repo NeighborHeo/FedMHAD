@@ -18,12 +18,14 @@ def get_vit_model(model_name : str, num_classes : int, pretrained : bool = False
 import segmentation_models_pytorch as smp
 from .segformer import *
 
-def get_network(model_name : str, num_classes : int, pretrained : bool = False):
+def get_network(model_name : str, num_classes : int, pretrained : bool = False, excluded_heads : list = []):
     if model_name == 'segformer': # segformer-b0
         network = SegFormerB0(num_classes=num_classes, encoder_weight=None) # binary classifier
         if pretrained:
             print("Loading pretrained model...")
             network.load_official_state_dict('segformer.b0.512x512.ade.160k.pth', strict=False) # the final prediction layer is not loaded
+        if len(excluded_heads) > 0:
+            network.setExcludedHeads(excluded_heads)
     elif model_name == 'unet':
-        network = smp.Unet('resnet34', encoder_weights='imagenet', classes=22)
+        network = smp.Unet('resnet34', encoder_weights='imagenet', classes=num_classes)
     return network

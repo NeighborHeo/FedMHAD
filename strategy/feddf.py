@@ -190,7 +190,7 @@ class FedDF(FedAvg):
             (parameters_to_ndarrays(fit_res.parameters), fit_res.num_examples)
             for _, fit_res in results
         ]
-        fedavg_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        fedavg_model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained, self.args.excluded_heads)
         self.load_parameter(fedavg_model, aggregate(weights_results))
         return fedavg_model
     

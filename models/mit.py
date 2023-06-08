@@ -61,6 +61,7 @@ class Attention(nn.Module):
         self.num_heads = num_heads
         head_dim = dim // num_heads
         self.scale = qk_scale or head_dim ** -0.5
+        self.excluded_heads = None
 
         self.q = nn.Linear(dim, dim, bias=qkv_bias)
         self.kv = nn.Linear(dim, dim * 2, bias=qkv_bias)
@@ -90,6 +91,10 @@ class Attention(nn.Module):
             if m.bias is not None:
                 m.bias.data.zero_()
 
+    def setExcludedHeads(self, excluded_heads):
+        print("Attention - set Excluded heads: ", excluded_heads)
+        self.excluded_heads = excluded_heads
+
     def forward(self, x, H, W, return_attn=False):
         B, N, C = x.shape
         q = self.q(x).reshape(B, N, self.num_heads, C // self.num_heads).permute(0, 2, 1, 3)
@@ -105,6 +110,15 @@ class Attention(nn.Module):
 
         attn = (q @ k.transpose(-2, -1)) * self.scale
         attn = attn.softmax(dim=-1)
+        
+        # ----------------------------------
+        if self.excluded_heads is not None:
+            attn_mask = torch.ones_like(attn)
+            for head_idx in self.excluded_heads:
+                attn_mask[:, head_idx, :, :] = 0
+            attn = attn * attn_mask
+        # ----------------------------------
+        
         attn = self.attn_drop(attn)
 
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
@@ -148,7 +162,13 @@ class Block(nn.Module):
             m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
             if m.bias is not None:
                 m.bias.data.zero_()
-
+    
+    # ----------------------------------
+    def setExcludedHeads(self, excluded_heads):
+        print("Block - set excluded heads : ", excluded_heads)
+        self.attn.setExcludedHeads(excluded_heads)
+    # ----------------------------------
+    
     def forward(self, x, H, W, return_attn=False):
         if return_attn:
             x, attn = self.attn(self.norm1(x), H, W, return_attn)
@@ -261,7 +281,17 @@ class MixVisionTransformer(nn.Module):
         # self.head = nn.Linear(embed_dims[3], num_classes) if num_classes > 0 else nn.Identity()
 
         self.apply(self._init_weights)
-
+    
+    # ----------------------------------
+    def setExcludedHeads(self, excluded_heads):
+        # self.block1
+        # self.block2
+        # self.block3
+        for i in range(len(self.block4)):
+            print(f"self.block4[{i}]-setExcludedHeads : {excluded_heads}")
+            self.block4[i].setExcludedHeads(excluded_heads)
+    # ----------------------------------
+    
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
             trunc_normal_(m.weight, std=.02)

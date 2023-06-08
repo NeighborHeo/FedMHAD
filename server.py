@@ -190,7 +190,7 @@ def main() -> None:
     experiment = init_comet_experiment(args)
 
     # Load model
-    model = models.get_network(args.model_name, args.num_classes, args.pretrained)
+    model = models.get_network(args.model_name, args.num_classes, args.pretrained, args.excluded_heads)
     custom_server = ServerManager(model, args, experiment)
     custom_server.start_server(args.port, args.num_rounds)
 

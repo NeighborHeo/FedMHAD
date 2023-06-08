@@ -26,11 +26,15 @@ def init_args(server=True):
     parser.add_argument("--weight_decay", type=float, default=1e-5, required=False, help="Weight decay. Default: 1e-5")
     parser.add_argument("--batch_size", type=int, default=16, required=False, help="Batch size. Default: 32")
     # server arguments
-    parser.add_argument("--strategy", type=str, default="fedmhad", required=False, help="Strategy to use. Default: fedmhad")
+    parser.add_argument("--strategy", type=str, default="fedavg", required=False, help="Strategy to use. Default: fedmhad")
     parser.add_argument("--use_class_weights", type=bool, default=False, required=False, help="Set to true to use class weights. Default: False")
     parser.add_argument("--multifly_lr_lastlayer", type=float, default=100.0, required=False, help="Multiply learning rate of last layer by this factor. Default: 100.0")
     
-    parser.add_argument("--malicious", type=int, default=1, required=False, help="Number of malicious clients. Default: 0")
+    parser.add_argument("--malicious", type=int, default=0, required=False, help="Number of malicious clients. Default: 0")
+    
+    # model arguments
+    parser.add_argument("--excluded_heads", type=int, nargs="+", default=[0], required=False, help="Exclude heads from training. Default: []")
+    
     # client arguments
     if not server:
         parser.add_argument("--index", type=int, default=0, required=False, help="Index of the client")
@@ -40,6 +44,7 @@ def init_args(server=True):
     if args.dataset == "pascal_voc":
         args.num_classes = 21
         args.task = "multilabel"
+        print("args.excluded_heads", args.excluded_heads)
     elif args.dataset == "cifar10":
         args.num_classes = 10
         args.task = "singlelabel"

@@ -45,7 +45,7 @@ class CustomClient(fl.client.NumPyClient):
         self.save_path = f"checkpoints/{args.port}/client_{args.index}_best_models"
         self.early_stopper = utils.EarlyStopper(patience=10, delta=1e-4, checkpoint_dir=self.save_path)
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and self.args.use_cuda else "cpu")
-        self.model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained)
+        self.model = models.get_network(self.args.model_name, self.args.num_classes, self.args.pretrained, self.args.excluded_heads)
         self.trainLoader = None
         self.valLoader = None
         self.testLoader = None
@@ -168,17 +168,16 @@ def client_dry_run(experiment: Optional[Experiment] = None
     """Weak tests to check whether all client methods are working as
     expected."""
     
-    model = models.get_network(args.model_name, args.num_classes, args.pretrained)
-    trainset, testset = utils.load_partition(0)
-    trainset = torch.utils.data.Subset(trainset, range(10))
-    testset = torch.utils.data.Subset(testset, range(10))
-    device = torch.device("cuda:0" if torch.cuda.is_available() and args.use_cuda else "cpu")
-    print("Using device:", device)
-    client = CustomClient(trainset, testset, device, experiment= experiment, args= args)
-    client.fit(
-        utils.get_model_params(model),
-        {"batch_size": 16, "local_epochs": 1},
-    )
+    model = models.get_network(args.model_name, args.num_classes, args.pretrained, args.excluded_heads)
+    client = CustomClient(validation_split=0.1, experiment= experiment, args= args)
+    for r in range(20):
+        parameters_prime, num_examples_train, results = client.fit(
+            utils.get_model_params(model),
+            {"batch_size": 16, "local_epochs": 3, "server_round": r},
+        )
+        model = client.set_parameters(parameters_prime)
+        client.evaluate(utils.get_model_params(model), {"test_steps": 32, "server_round": r})
+
 
 #     client.evaluate(utils.get_model_params(model), {"test_steps": 32})
 #     print("Dry Run Successful")

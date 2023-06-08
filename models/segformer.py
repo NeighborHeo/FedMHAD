@@ -64,6 +64,13 @@ class SegFormer(nn.Module):
                                      embedding_dim=embedding_dim,
                                      dropout_ratio=dropout_ratio
                                      )
+    
+    # ----------------------------------
+    def setExcludedHeads(self, excluded_heads):
+        print("SegFormer - set excluded head : ", excluded_heads)
+        self.backbone.setExcludedHeads(excluded_heads)
+    # ----------------------------------
+    
     def forward(self, x, return_attn=False):
         if return_attn:
             out, attn = self.backbone(x, return_attn)
