@@ -161,10 +161,19 @@ class PascalVocSegmentationPartition():
     
     def load_partition(self, partition=-1):
         # load split files
-        split_path = pathlib.Path(f"/home/suncheol/code/FedTest/0_FedMHAD_Seg/splitfile/{self.args.dataset}")
-        with open(split_path / f'dirichlet_{self.args.alpha}_for_{self.args.num_clients}_clients', "r") as f:
-            split_data_index_dict = json.load(f)
+        if partition == -1:
+            return self.train_dataset, self.test_dataset
         
+        split_path = pathlib.Path(f"/home/suncheol/code/FedTest/0_FedMHAD_Seg/splitfile/{self.args.dataset}")
+        if self.args.alpha > 0:
+            print("dirichlet")
+            with open(split_path / f'dirichlet_{self.args.alpha}_for_{self.args.num_clients}_clients', "r") as f:
+                split_data_index_dict = json.load(f)
+        else:
+            print("iid")
+            with open(split_path / f'iid_for_{self.args.num_clients}_clients', "r") as f:
+                split_data_index_dict = json.load(f)
+
         split_data_index_dict = {int(k):v for k,v in split_data_index_dict.items()}
         
         if partition in self.malicious:
