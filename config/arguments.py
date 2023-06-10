@@ -16,7 +16,7 @@ def init_args(server=True):
     parser.add_argument("--num_clients", type=int, default=10, required=False, help="Number of clients to use. Default: 5")
     parser.add_argument("--dataset", type=str, default="pascal_voc", required=False, help="Dataset to use. Default: pascal_voc")
     parser.add_argument("--datapath", type=str, default="~/.data/", required=False, help="dataset path")
-    parser.add_argument("--alpha", type=float, default=0.1, required=False, help="alpha")
+    parser.add_argument("--alpha", type=float, default=0.1, required=False, help="alpha < 0 is iid, 0.1 is non-iid. Default: 0.1")
     parser.add_argument("--noisy", type=float, default=0.0, required=False, help="Percentage of noisy data. Default: 0.0")
     # learning arguments
     parser.add_argument("--num_rounds", type=int, default=100, required=False, help="Number of rounds to run. Default: 30")
@@ -33,11 +33,11 @@ def init_args(server=True):
     parser.add_argument("--malicious", type=int, default=0, required=False, help="Number of malicious clients. Default: 0")
     
     # model arguments
-    parser.add_argument("--excluded_heads", type=int, nargs="+", default=[0], required=False, help="Exclude heads from training. Default: []")
+    parser.add_argument("--excluded_heads", type=int, nargs="+", default=[], required=False, help="Exclude heads from training. Default: []")
     
     # client arguments
     if not server:
-        parser.add_argument("--index", type=int, default=0, required=False, help="Index of the client")
+        parser.add_argument("--index", type=int, default=-1, required=False, help="Index of the client")
         parser.add_argument("--dry", type=bool, default=False, required=False, help="Set to true to use only 10 datasamples for validation. Useful for testing purposes. Default: False" )
 
     args = parser.parse_args()

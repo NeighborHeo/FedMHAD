@@ -37,8 +37,8 @@ class ServerManager:
     def fit_config(self, server_round: int) -> Dict[str, int]:
         return {
             "server_round": server_round,
-            "batch_size": 16,
-            "local_epochs": 1, # if server_round < 2 else 2,
+            "batch_size": self.args.batch_size,
+            "local_epochs": self.args.local_epochs,
         }
 
     def evaluate_config(self, server_round: int) -> Dict[str, int]:

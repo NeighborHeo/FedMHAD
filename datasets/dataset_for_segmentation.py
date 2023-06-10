@@ -35,7 +35,28 @@ class VOCSegDataset(datasets.VOCSegmentation):
         else:
             self.resize = None
         self.malicious = malicious
-        
+        self.num_of_voc_classes = 21
+    
+    def set_only_use_class(self):
+        drop_indices = self.__filter_None_classes__(self.masks)
+        print(f"Drop {len(drop_indices)} images")
+        self.images = [self.images[i] for i in range(len(self.images)) if i not in drop_indices]
+        self.targets = [self.targets[i] for i in range(len(self.targets)) if i not in drop_indices]
+    
+    def __filter_None_classes__(self, masks):
+        only_use_class = self.get_only_use_class()
+        indices = []
+        for i in range(len(masks)):
+            # if has only background
+            label = Image.open(masks[i])
+            unique_class = np.unique(label, return_counts=False)
+            # filter only_use_class
+            unique_class = [c for c in unique_class if c in only_use_class]
+            if len(unique_class) == 1 and unique_class[0] == 0:
+                indices.append(i)
+                continue
+        return indices
+    
     def __getitem__(self, idx):
         # image = cv2.cvtColor(cv2.imread(self.images[idx]), cv2.COLOR_BGR2RGB)
         image = Image.open(self.images[idx]).convert('RGB')
@@ -46,6 +67,7 @@ class VOCSegDataset(datasets.VOCSegmentation):
             image = augmented['image'] #/ 255# .float()
             label = augmented['mask'].long() # torch.Size([224, 224])
             label[label > 20] = 0
+            # label = self.__set_only_use_class__(label)
             if self.resize is not None:
                 label = self.resize(label.unsqueeze(0)).squeeze(0)
         
@@ -56,6 +78,18 @@ class VOCSegDataset(datasets.VOCSegmentation):
     
     def set_malicious(self, malicious):
         self.malicious = malicious
+
+    def get_only_use_class(self):
+        return [0, 1, 9, 12] # background, airplane, chair, dog 
+
+    def __set_only_use_class__(self, label):
+        only_use_class = self.get_only_use_class()
+        for i in range(self.num_of_voc_classes):
+            if i not in only_use_class:
+                label[label == i] = 0
+        for i in range(len(only_use_class)):
+            label[label == only_use_class[i]] = i
+        return label
 
     def __shift_segmentation_mask__(self, mask):
         shifted_mask = mask.clone() # 원본 마스크 복사
@@ -132,8 +166,31 @@ class mydataset(torch.utils.data.Dataset):
         if self.transforms:
             img = self.transforms(img)
         idx = torch.tensor(0)
+        
+        # total_classes = self.get_voc_total_classes()
+        # used_classes = self.get_used_classes()
+        
+        
+        # # for c in enumerate(total_classes):
+        # #     for j, uc in enumerate(used_classes):
+        # #         gt[gt == uc] = j
+        # i = 1
+        # for class_index in range(1, 21):
+        #     if class_index not in [1, 9, 12]: # airplane, chair, dog
+        #         gt[gt==class_index] = 0
+        #     else:
+        #         gt[gt==class_index] = i
+        #         i += 1
+            
         # return img, gt, idx
         return img, gt
+    
+    def get_voc_total_classes(self):
+        return { 0: "background", 1: "aeroplane", 2: "bicycle", 3: "bird", 4: "boat", 5: "bottle", 6: "bus", 7: "car", 8: "cat", 9: "chair", 10: "cow", 11: "diningtable", 12: "dog", 13: "horse", 14: "motorbike", 15: "person", 16: "pottedplant", 17: "sheep", 18: "sofa", 19: "train", 20: "tvmonitor" }
+    
+    def get_used_classes(self):
+        return { 0: "background", 1: "aeroplane", 9: "chair", 12: "dog" }
+    
     def get_labels(self):
         return self.gt
     
@@ -161,31 +218,38 @@ class PascalVocSegmentationPartition():
     
     def load_partition(self, partition=-1):
         # load split files
-        if partition == -1:
-            return self.train_dataset, self.test_dataset
+        split_path = pathlib.Path(f"/home/suncheol/code/FedTest/0_FedMHAD_Seg/splitfile/{self.args.dataset}_{self.args.num_clients}_clients")
+        if split_path.exists():
+            if self.args.alpha > 0:
+                print("dirichlet")
+                with open(split_path / f'dirichlet_{self.args.alpha}_for_{self.args.num_clients}_clients', "r") as f:
+                    split_data_index_dict = json.load(f)
+                    split_data_index_dict = {int(k):v for k,v in split_data_index_dict.items()}
+            else:
+                print("iid")
+                with open(split_path / f'iid_for_{self.args.num_clients}_clients', "r") as f:
+                    split_data_index_dict = json.load(f)
+                    split_data_index_dict = {int(k):v for k,v in split_data_index_dict.items()}
         
-        split_path = pathlib.Path(f"/home/suncheol/code/FedTest/0_FedMHAD_Seg/splitfile/{self.args.dataset}")
-        if self.args.alpha > 0:
-            print("dirichlet")
-            with open(split_path / f'dirichlet_{self.args.alpha}_for_{self.args.num_clients}_clients', "r") as f:
-                split_data_index_dict = json.load(f)
-        else:
-            print("iid")
-            with open(split_path / f'iid_for_{self.args.num_clients}_clients', "r") as f:
-                split_data_index_dict = json.load(f)
-
-        split_data_index_dict = {int(k):v for k,v in split_data_index_dict.items()}
+        test_index_path = split_path / "test_index"
+        if test_index_path.exists():
+            with open(test_index_path, "r") as f:
+                test_index = json.load(f)
+                if test_index is not None:
+                    test_index = test_index["test"]
         
         if partition in self.malicious:
             self.train_dataset.set_malicious(True)
             
         if partition >= 0:
             train_dataset = torch.utils.data.Subset(self.train_dataset, split_data_index_dict[partition])
-            n_test = int(len(self.test_dataset) / self.args.num_clients)
-            test_dataset = torch.utils.data.Subset(self.test_dataset, range(partition * n_test, (partition + 1) * n_test))
+            test_dataset = self.test_dataset
+            # torch.utils.data.Subset(self.test_dataset, test_index) if test_index is not None else self.test_dataset
+            # n_test = int(len(test_dataset) / self.args.num_clients)
+            # test_dataset = torch.utils.data.Subset(self.test_dataset, range(partition * n_test, (partition + 1) * n_test))
         else:
             train_dataset = self.train_dataset
-            test_dataset = self.test_dataset
+            test_dataset = self.test_dataset #torch.utils.data.Subset(self.test_dataset, test_index) if test_index is not None else self.test_dataset
             
         print(len(train_dataset), len(test_dataset))
         return train_dataset, test_dataset

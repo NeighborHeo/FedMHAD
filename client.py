@@ -170,10 +170,10 @@ def client_dry_run(experiment: Optional[Experiment] = None
     
     model = models.get_network(args.model_name, args.num_classes, args.pretrained, args.excluded_heads)
     client = CustomClient(validation_split=0.1, experiment= experiment, args= args)
-    for r in range(20):
+    for r in range(args.num_rounds):
         parameters_prime, num_examples_train, results = client.fit(
             utils.get_model_params(model),
-            {"batch_size": 16, "local_epochs": 3, "server_round": r},
+            {"batch_size": args.batch_size, "local_epochs": args.local_epochs, "server_round": r},
         )
         model = client.set_parameters(parameters_prime)
         client.evaluate(utils.get_model_params(model), {"test_steps": 32, "server_round": r})
@@ -191,6 +191,8 @@ def init_comet_experiment(args: argparse.Namespace):
     experiment.log_parameters(args)
     experiment.add_tag(args.strategy)
     experiment.add_tag(args.model_name)
+    experiment.add_tag(f"index_{args.index}")
+    experiment.add_tag(f"IID" if args.alpha < 0 else f"NIID")
     experiment.set_name(f"client_{args.index}_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     return experiment
 
