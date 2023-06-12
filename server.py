@@ -169,6 +169,9 @@ def init_comet_experiment(args: argparse.Namespace):
     experiment.log_code(folder="./datasets")
     experiment.add_tag(args.strategy)
     experiment.add_tag(args.model_name)
+    experiment.add_tag(args.batch_size)
+    experiment.add_tag(f"IID" if args.alpha < 0 else f"NIID")
+    experiment.add_tag(args.loss_fn)
     experiment.set_name(f"global_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     # class Experiment():
     #     def log_metrics(self, result: Dict[str, float], step: int):

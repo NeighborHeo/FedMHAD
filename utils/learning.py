@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import torchmetrics
+import segmentation_models_pytorch as smp
 
 # Poutyne Model on GPU
 from poutyne import Model
@@ -40,7 +41,15 @@ def train(net, trainloader, valloader, epochs, device: str = "cpu", args=None):
     #         print('Model loaded from {}'.format(model_path))
 
     # specifying loss function
-    criterion = nn.CrossEntropyLoss()
+    if args.loss_fn == "cross_entropy":
+        criterion = nn.CrossEntropyLoss()
+    elif args.loss_fn == "dice_loss":
+        criterion = smp.losses.DiceLoss(mode = 'multiclass')
+    elif args.loss_fn == "focal_loss":
+        criterion = smp.losses.FocalLoss(mode = 'multiclass')
+    elif args.loss_fn == "LovaszLoss":
+        criterion = smp.losses.LovaszLoss(mode = 'multiclass')
+        
     model = Model(
         net,
         optimizer,
@@ -65,7 +74,15 @@ def test(net, testloader, steps: int = None, device: str = "cpu", args=None):
     ]
     optimizer = optim.Adam(parameters, lr=args.learning_rate)
 
-    criterion = nn.CrossEntropyLoss()
+    if args.loss_fn == "cross_entropy":
+        criterion = nn.CrossEntropyLoss()
+    elif args.loss_fn == "dice_loss":
+        criterion = smp.losses.DiceLoss(mode = 'multiclass')
+    elif args.loss_fn == "focal_loss":
+        criterion = smp.losses.FocalLoss(mode = 'multiclass')
+    elif args.loss_fn == "LovaszLoss":
+        criterion = smp.losses.LovaszLoss(mode = 'multiclass')
+        
     model = Model(
         net,
         optimizer,

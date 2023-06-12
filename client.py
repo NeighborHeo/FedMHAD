@@ -193,6 +193,7 @@ def init_comet_experiment(args: argparse.Namespace):
     experiment.add_tag(args.model_name)
     experiment.add_tag(f"index_{args.index}")
     experiment.add_tag(f"IID" if args.alpha < 0 else f"NIID")
+    experiment.add_tag(args.loss_fn)
     experiment.set_name(f"client_{args.index}_({args.port}_{args.strategy})_lr_{args.learning_rate}_bs_{args.batch_size}_ap_{args.alpha}_ns_{args.noisy}")
     return experiment
 

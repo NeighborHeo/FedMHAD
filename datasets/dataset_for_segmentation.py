@@ -197,8 +197,8 @@ class mydataset(torch.utils.data.Dataset):
 class PascalVocSegmentationPartition():
     def __init__(self, args: argparse.Namespace):
         self.args = args
-        self.imagesize = (224, 224)
-        self.output_size = (56, 56)
+        self.imagesize = (args.input_size, args.input_size)
+        self.output_size = (args.output_size, args.output_size)
         self.train_dataset = VOCSegDataset( root='~/.data/', image_set='train', year='2012', download=False, transforms=self.get_train_transform(), output_size=self.output_size )
         self.test_dataset = VOCSegDataset( root='~/.data/', image_set='val', year='2012', download=False, transforms=self.get_train_transform(), output_size=self.output_size )
         self.malicious = np.random.choice(range(self.args.num_clients), size=int(self.args.malicious), replace=False)
@@ -207,7 +207,7 @@ class PascalVocSegmentationPartition():
     def get_train_transform(self):
         albumentations_transform = A.Compose([
             A.PadIfNeeded(min_height=256, min_width=256),
-            A.RandomCrop(224, 224),
+            A.RandomCrop(self.args.input_size, self.args.input_size),
             A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.05, rotate_limit=15, p=0.5),
             A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
             A.RandomBrightnessContrast(p=0.5),
@@ -243,10 +243,10 @@ class PascalVocSegmentationPartition():
             
         if partition >= 0:
             train_dataset = torch.utils.data.Subset(self.train_dataset, split_data_index_dict[partition])
-            test_dataset = self.test_dataset
+            # test_dataset = self.test_dataset
             # torch.utils.data.Subset(self.test_dataset, test_index) if test_index is not None else self.test_dataset
-            # n_test = int(len(test_dataset) / self.args.num_clients)
-            # test_dataset = torch.utils.data.Subset(self.test_dataset, range(partition * n_test, (partition + 1) * n_test))
+            n_test = int(len(self.test_dataset) / self.args.num_clients)
+            test_dataset = torch.utils.data.Subset(self.test_dataset, range(partition * n_test, (partition + 1) * n_test))
         else:
             train_dataset = self.train_dataset
             test_dataset = self.test_dataset #torch.utils.data.Subset(self.test_dataset, test_index) if test_index is not None else self.test_dataset
