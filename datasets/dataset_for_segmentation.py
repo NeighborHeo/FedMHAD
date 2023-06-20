@@ -200,9 +200,17 @@ class PascalVocSegmentationPartition():
         self.imagesize = (args.input_size, args.input_size)
         self.output_size = (args.output_size, args.output_size)
         self.train_dataset = VOCSegDataset( root='~/.data/', image_set='train', year='2012', download=False, transforms=self.get_train_transform(), output_size=self.output_size )
-        self.test_dataset = VOCSegDataset( root='~/.data/', image_set='val', year='2012', download=False, transforms=self.get_train_transform(), output_size=self.output_size )
+        self.test_dataset = VOCSegDataset( root='~/.data/', image_set='val', year='2012', download=False, transforms=self.get_test_transform(), output_size=self.output_size )
         self.malicious = np.random.choice(range(self.args.num_clients), size=int(self.args.malicious), replace=False)
         print(f"malicious clients: {self.malicious}")
+    
+    def get_test_transform(self):
+        albumentations_transform = A.Compose([
+            A.Resize(self.args.input_size, self.args.input_size),
+            A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)),
+            ToTensorV2(),
+        ])
+        return albumentations_transform
     
     def get_train_transform(self):
         albumentations_transform = A.Compose([

@@ -12,6 +12,7 @@ def init_args(server=True, ipykernel=False):
     parser.add_argument("--seed", type=int, default=42, required=False, help="seed")
     parser.add_argument("--toy", type=bool, default=False, required=False, help="Set to true to use only 10 datasamples for validation. Useful for testing purposes. Default: False" )
     parser.add_argument("--pretrained", type=bool, default=True, required=False, help="Set to true to use pretrained model. Default: False")
+
     # dataset arguments
     parser.add_argument("--num_clients", type=int, default=10, required=False, help="Number of clients to use. Default: 5")
     parser.add_argument("--dataset", type=str, default="pascal_voc", required=False, help="Dataset to use. Default: pascal_voc")
@@ -57,4 +58,7 @@ def init_args(server=True, ipykernel=False):
     elif args.dataset == "cifar10":
         args.num_classes = 10
         args.task = "singlelabel"
+        
+    if args.model_name == "segformer":
+        args.output_size = args.output_size // 4
     return args  

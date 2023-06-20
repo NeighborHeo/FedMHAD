@@ -26,6 +26,14 @@ def get_network(model_name : str, num_classes : int, pretrained : bool = False, 
             network.load_official_state_dict('segformer.b0.512x512.ade.160k.pth', strict=False) # the final prediction layer is not loaded
         if len(excluded_heads) > 0:
             network.setExcludedHeads(excluded_heads)
+            
     elif model_name == 'unet':
         network = smp.Unet('resnet34', encoder_weights='imagenet', classes=num_classes)
+        
+    elif model_name == 'deeplabv3plus':
+        network = smp.DeepLabV3Plus('resnet34', encoder_weights='imagenet', classes=num_classes)
+        
+    elif model_name == 'deeplabv3plus_mobile':
+        network = smp.DeepLabV3Plus('mobilenet_v2', encoder_weights='imagenet', classes=num_classes)
+    
     return network

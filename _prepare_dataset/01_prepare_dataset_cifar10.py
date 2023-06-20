@@ -281,8 +281,8 @@ def sampling_data(data, labels, sampling_ratio=1.0, seed=42):
     return data, labels
 
 def make_cifar10_growing_dirichlet_data(datapath, N_parties, N_classes, alpha=1000, sampling_ratio=1.0, seed=42):
-    train_path = pathlib.Path(datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'train'
-    test_path = pathlib.Path(datapath).expanduser() / 'cifar10' / f'cifar10_224_growing_dirichlet' / 'test'
+    train_path = pathlib.Path(datapath).expanduser() / 'cifar10' / f'cifar10_224_{N_parties}_growing_dirichlet' / 'train'
+    test_path = pathlib.Path(datapath).expanduser() / 'cifar10' / f'cifar10_224_{N_parties}_growing_dirichlet' / 'test'
     if not train_path.exists() or not test_path.exists():
         train_path.mkdir(parents=True, exist_ok=True)
         test_path.mkdir(parents=True, exist_ok=True)
@@ -332,10 +332,10 @@ def main():
     # make_cifar10_dirichlet_data(datapath='~/.data', N_parties=20, N_classes=10, alpha=0.1, sampling_ratio=0.1, seed=42)
     # make_cifar10_dirichlet_data(datapath='~/.data', N_parties=20, N_classes=10, noise=0.1, sampling_ratio=1.0, seed=42)
     # make_cifar10_dirichlet_noise_data(datapath='~/.data', N_parties=10, N_classes=10, noise=0.03, sampling_ratio=1.0, seed=42)
-    make_cifar10_growing_dirichlet_data(datapath='~/.data', N_parties=10, N_classes=10, sampling_ratio=1.0, seed=42)
+    make_cifar10_growing_dirichlet_data(datapath='~/.data', N_parties=20, N_classes=10, sampling_ratio=1.0, seed=42)
     args = argparse.Namespace()
     args.datapath = '~/.data'
-    args.N_parties = 10
+    args.N_parties = 20
     args.num_classes = 10
     args.alpha = 0.1
     args.task = 'singlelabel'
