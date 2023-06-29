@@ -144,7 +144,7 @@ def distill_with_logits_n_attns(model: torch.nn.Module, ensembled_logits: torch.
     # print(f"attention shape: {attns.shape}")
     loss2 = criterion2(total_attns.to(device), attns, None) #sim_weights)
     lambda_ = 0.5
-    print(f"Distillation Loss: {loss.item()}, Attention Loss: {loss2.item()}")
+    # print(f"Distillation Loss: {loss.item()}, Attention Loss: {loss2.item()}")
     total_loss = (1-lambda_) * loss + lambda_ * loss2
     # total_loss = loss + 100*loss2
     total_loss.backward()
